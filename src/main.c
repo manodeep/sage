@@ -5,7 +5,6 @@
 #include <mpi.h>
 #endif
 
-#include "macros.h"
 #include "sage.h"
 
 
@@ -22,7 +21,11 @@ int main(int argc, char **argv)
 
     if(argc != 2) {
         printf("\n  usage: sage <parameterfile>\n\n");
-        ABORT(0);
+#ifdef MPI        
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+        MPI_Finalize();
+#endif
+        return EXIT_FAILURE;
     }
 
     /* initialize sage (read parameter file, setup units, read cooling tables etc) */
