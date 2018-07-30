@@ -53,24 +53,26 @@ void load_forest_table_binary(struct forest_info *forests_info)
 
     forests_info->nforests = nforests;
     forests_info->totnhalos_per_forest = forestnhalos;/* this will work because I am modifying a pointer contained within a struct */
-    /*
-      number of bytes offset to get to the first tree.
-      int32_t nforests, int32_t totnhalos, (int32_t \times nforests) forestnhalos
-       
-     */
+    
+    /* number of bytes offset to get to the first tree.
+       nforests --> int32_t == 4 bytes, totnhalos --> int32_t == 4 bytes, (int32_t \times nforests) forestnhalos */
     off_t size_so_far = 4 + 4 + sizeof(int32_t) * nforests;
-    forests_info->bytes_offset_for_forest = mycalloc(nforests, sizeof(forests_info->bytes_offset_for_forest[0]));
+    forests_info->lht.bytes_offset_for_forest = mycalloc(nforests, sizeof(forests_info->lht.bytes_offset_for_forest[0]));
     for(int32_t i=0;i<nforests;i++) {
-        forests_info->bytes_offset_for_forest[i] = size_so_far;
+        forests_info->lht.bytes_offset_for_forest[i] = size_so_far;
         size_so_far += forestnhalos[i] * sizeof(struct halo_data);
     }
 }
 
-void load_forest_binary(const int32_t forestnr, const int32_t nhalos, struct halo_data **halos, struct forest_info *forests_info)
+void load_forest_binary(const int32_t forestnr, struct halo_data **halos, struct forest_info *forests_info)
 {
-    /* must have an FD */
-    assert(forests_info->fp );
+    /* must have a file pointer  */
+    if(forests_info->fp == NULL) {
+        fprintf(stderr,"Error: File pointer is NULL (i.e., you need to open the file before reading) \n");
+        ABORT(INVALID_FILE_POINTER);
+    }
 
+    const int32_t nhalos = forests_info->totnhalos_per_forest[forestnr];
     /* also assumes that file pointer is at correct location */
     struct halo_data *local_halos = mymalloc(sizeof(struct halo_data) * nhalos);
 
@@ -78,7 +80,7 @@ void load_forest_binary(const int32_t forestnr, const int32_t nhalos, struct hal
     (void) forestnr;
     myfread(local_halos, nhalos, sizeof(struct halo_data), forests_info->fp);
 #else
-    const off_t offset = forests_info->bytes_offset_for_forest[forestnr];
+    const off_t offset = forests_info->lht.bytes_offset_for_forest[forestnr];
     mypread(forests_info->fd, local_halos, sizeof(struct halo_data) * nhalos, offset);
 #endif
 
@@ -98,8 +100,8 @@ void close_binary_file(struct forest_info *forests_info)
         forests_info->fd = -1;
     }
 
-    if(forests_info->bytes_offset_for_forest) {
-        free(forests_info->bytes_offset_for_forest);
+    if(forests_info->lht.bytes_offset_for_forest) {
+        free(forests_info->lht.bytes_offset_for_forest);
     }
 #endif
 }

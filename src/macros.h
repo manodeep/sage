@@ -21,7 +21,9 @@
     do {                                                                \
         printf("Error in file: %s\tfunc: %s\tline: %i\n", __FILE__, __FUNCTION__, __LINE__); \
         printf("exit code = %d\n", sigterm);                            \
+        perror(NULL);                                                   \
     } while(0)
+
 
 #define  STEPS 10         /* Number of integration intervals between two snapshots */
 #define  MAXGALFAC 1
@@ -82,40 +84,40 @@
 
 /* Function-like macros */
 #ifdef NDEBUG
-#define XASSERT(EXP, ...)                                                                          \
-  do {                                                                                             \
-  } while (0)
+#define XASSERT(EXP, EXIT_STATUS, ...)                                  \
+    do {                                                                \
+    } while (0)
 #else
-#define XASSERT(EXP, ...)                                                                          \
-  do {                                                                                             \
-    if (!(EXP)) {                                                                                  \
-      fprintf(stderr, "Error in file: %s\tfunc: %s\tline: %d with expression `" #EXP "'\n",        \
-              __FILE__, __FUNCTION__, __LINE__);                                                   \
-      fprintf(stderr, __VA_ARGS__);                                                                \
-      fprintf(stderr, ANSI_COLOR_BLUE "Hopefully, input validation. Otherwise, bug in code: "      \
-                                      "please email Manodeep Sinha "                               \
-                                      "<manodeep@gmail.com>" ANSI_COLOR_RESET "\n");               \
-      return EXIT_FAILURE;                                                                         \
-    }                                                                                              \
+#define XASSERT(EXP, EXIT_STATUS, ...)                                  \
+    do {                                                                \
+        if (!(EXP)) {                                                   \
+            fprintf(stderr, "Error in file: %s\tfunc: %s\tline: %d with expression `" #EXP "'\n", \
+                    __FILE__, __FUNCTION__, __LINE__);                  \
+            fprintf(stderr, __VA_ARGS__);                               \
+            fprintf(stderr, ANSI_COLOR_BLUE "Hopefully, input validation. Otherwise, bug in code: " \
+                    "please email Manodeep Sinha "                      \
+                    "<manodeep@gmail.com>" ANSI_COLOR_RESET "\n");      \
+            ABORT(EXIT_STATUS);                                         \
+        }                                                               \
   } while (0)
 #endif
 
 #ifdef NDEBUG
-#define XPRINT(EXP, ...)                                                                           \
-  do {                                                                                             \
-  } while (0)
+#define XPRINT(EXP, ...)                                                \
+    do {                                                                \
+    } while (0)
 #else
-#define XPRINT(EXP, ...)                                                                           \
-  do {                                                                                             \
-    if (!(EXP)) {                                                                                  \
-      fprintf(stderr, "Error in file: %s\tfunc: %s\tline: %d with expression `" #EXP "'\n",        \
-              __FILE__, __FUNCTION__, __LINE__);                                                   \
-      fprintf(stderr, __VA_ARGS__);                                                                \
-      fprintf(stderr, ANSI_COLOR_BLUE "Hopefully, input validation. Otherwise, bug in code: "      \
-                                      "please email Manodeep Sinha "                               \
-                                      "<manodeep@gmail.com>" ANSI_COLOR_RESET "\n");               \
-    }                                                                                              \
-  } while (0)
+#define XPRINT(EXP, ...)                                                \
+    do {                                                                \
+        if (!(EXP)) {                                                   \
+            fprintf(stderr, "Error in file: %s\tfunc: %s\tline: %d with expression `" #EXP "'\n", \
+                    __FILE__, __FUNCTION__, __LINE__);                  \
+            fprintf(stderr, __VA_ARGS__);                               \
+            fprintf(stderr, ANSI_COLOR_BLUE "Hopefully, input validation. Otherwise, bug in code: " \
+                    "please email Manodeep Sinha "                      \
+                    "<manodeep@gmail.com>" ANSI_COLOR_RESET "\n");      \
+        }                                                               \
+    } while (0)
 #endif
 
 #ifdef NDEBUG

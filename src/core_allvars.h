@@ -196,7 +196,7 @@ enum Valid_TreeTypes
 
 /* do not use '0' as an enum since that '0' usually
    indicates 'success' on POSIX systems */
-typedef enum {
+enum sage_error_types {
     /* start off with a large number */
     FILE_NOT_FOUND=1 << 12,
     SNAPSHOT_OUT_OF_RANGE,
@@ -207,14 +207,49 @@ typedef enum {
     NULL_POINTER_FOUND,
     FILE_READ_ERROR,
     FILE_WRITE_ERROR,
-} sage_error_types;
+    INVALID_FILE_POINTER,
+    INVALID_FILE_DESCRIPTOR,
+    INVALID_VALUE_READ_FROM_FILE,
+};
+
+struct lhalotree_info {
+    off_t *bytes_offset_for_forest;
+};
+
+struct ctrees_tree_level_info {
+    off_t offset;/* the byte offset in file corresponding to where the tree data begins */
+    int32_t fd; /* file descriptor for tree */
+    int32_t nhalos;/* number of halos in tree */
+};
+
+struct ctrees_info {
+    int64_t nforests;//redundant but helps with the coding
+
+    /* forest level quantities */
+    int64_t *ntrees_per_forest;/* contains nforests elements */
+    int64_t *start_treenum_per_forest;/* contains nforests elements */
+    
+    /* tree level quantities */
+    int *tree_fd;/* contains ntrees elements */
+    off_t *tree_offsets;/* contains ntrees elements */
+
+    /* file level quantities */
+    int64_t numfiles;/* total number of files the forests are spread over (BOX_DIVISIONS^3 per Consistent trees terminology) */
+    int *open_fds;/* contains numfiles elements of open file descriptors */
+};
+
+/* place-holder for future AHF i/o capabilities */
+struct ahf_info {
+    void *some_yet_to_be_implemented_ptr;
+};
 
 struct forest_info {
-    int32_t nforests;
-    int32_t nsnapshots;
     int32_t *totnhalos_per_forest;
-    off_t *bytes_offset_for_forest;
-    int32_t **nhalos_per_forest_per_snapshot;
+    union {
+        struct lhalotree_info lht;
+        struct ctrees_info ctr;
+        struct ahf_info ahf;
+    };
     union {
         FILE *fp;
         int fd;
@@ -222,7 +257,9 @@ struct forest_info {
         hid_t hdf5_fp;
 #endif
     };
-    char filename[4*MAX_STRING_LEN + 1];
+    int32_t nforests;
+    int32_t nsnapshots;
+    char filename[4*MAX_STRING_LEN];
 };
 
 

@@ -11,9 +11,8 @@ extern "C" {
 }
 #endif
 
-void init_sage(const int ThisTask, const char *param_file);
-void sage(const int ThisTask, const int NTasks);
-void finalize_sage(void);
+extern void init_sage(const int ThisTask, const char *param_file);
+extern void run_sage(const int ThisTask, const int NTasks);
 
 #ifdef __cplusplus
 }

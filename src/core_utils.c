@@ -27,6 +27,7 @@
 #include <string.h>
 #include <limits.h>
 #include <stdarg.h>
+#include <ctype.h>
 
 /* for pread/pwrite */
 #include <sys/types.h>
@@ -124,6 +125,39 @@ char *get_time_string(struct timeval t0, struct timeval t1)
   }
 
   return time_string;
+}
+
+int64_t getnumlines(const char *fname,const char comment)
+{
+    FILE *fp= NULL;
+    const int MAXLINESIZE = 10000;
+    int64_t nlines=0;
+    char str_line[MAXLINESIZE];
+
+    fp = fopen(fname,"rt");
+    if(fp == NULL) {
+        return -1;
+    }
+
+    while(1){
+        if(fgets(str_line, MAXLINESIZE,fp)!=NULL) {
+            /*
+              fgets always terminates the string with a '\0'
+              on a successful read
+             */
+            char *c = &str_line[0];
+            while(*c != '\0' && isspace(*c)) {
+                c++;
+            }
+            if(*c != '\0' && *c !=comment) {
+                 nlines++;
+            }
+        } else {
+            break;
+        }
+    }
+    fclose(fp);
+    return nlines;
 }
 
 

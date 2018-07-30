@@ -80,6 +80,41 @@ void free_forest_table(enum Valid_TreeTypes my_TreeType, struct forest_info *for
     }
 }
 
+
+
+void cleanup_forests_io(enum Valid_TreeTypes my_TreeType, struct forest_info *forests_info)
+{
+    /* Don't forget to free the open file handle */
+    switch (my_TreeType) {
+#ifdef HDF5
+    case genesis_lhalo_hdf5:
+        break;
+        
+    case genesis_standard_hdf5:
+        break;
+#endif
+            
+    case lhalo_binary:
+        break;
+        
+    case consistent_trees_ascii:
+
+        /* because consistent trees can only be cleaned up after *ALL* forests
+           have been processed (and not on a `per file` basis)
+         */
+        cleanup_forests_io_ctrees(forests_info);
+        break;
+
+    default:
+        fprintf(stderr, "Your tree type has not been included in the switch statement for function ``%s`` in file ``%s``.\n", __FUNCTION__, __FILE__);
+        fprintf(stderr, "Please add it there.\n");
+        ABORT(EXIT_FAILURE);
+        
+    }
+
+    return;
+}
+
 void load_forest(const int forestnr, const int nhalos, enum Valid_TreeTypes my_TreeType, struct halo_data **halos, struct forest_info *forests_info)
 {
 
@@ -100,11 +135,13 @@ void load_forest(const int forestnr, const int nhalos, enum Valid_TreeTypes my_T
 #endif            
         
     case lhalo_binary:
-        load_forest_binary(forestnr, nhalos, halos, forests_info);
+        (void) nhalos;
+        load_forest_binary(forestnr, halos, forests_info);
         break;
         
     case consistent_trees_ascii:
-        load_forest_ctrees(forestnr, nhalos, halos, forests_info);
+        (void) nhalos;
+        load_forest_ctrees(forestnr, halos, forests_info);
         break;
 
     default:

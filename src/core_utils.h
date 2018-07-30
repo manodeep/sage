@@ -23,6 +23,7 @@ extern "C" {
     extern int my_snprintf(char *buffer, int len, const char *format, ...)
         __attribute__((format(printf, 3, 4)));
     extern char *get_time_string(struct timeval t0, struct timeval t1);
+    extern int64_t getnumlines(const char *fname,const char comment);
     extern size_t myfread(void *ptr, const size_t size, const size_t nmemb, FILE * stream);
     extern size_t myfwrite(const void *ptr, const size_t size, const size_t nmemb, FILE * stream);
     extern int myfseek(FILE * stream, const long offset, const int whence);

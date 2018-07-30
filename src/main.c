@@ -29,11 +29,8 @@ int main(int argc, char **argv)
     init_sage(ThisTask, argv[1]);
 
     /* run sage over all files */
-    sage(ThisTask, NTasks);
+    run_sage(ThisTask, NTasks);
     
-    /* run the final steps and any cleanup */
-    finalize_sage();
-
 #ifdef MPI
     MPI_Finalize();
 #endif

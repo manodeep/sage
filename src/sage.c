@@ -15,7 +15,7 @@
 #include "core_tree_utils.h"
 
 /* main sage -> not exposed externally */
-static void sage_per_file(const int ThisTask, const int filenr);
+static void sage_per_file(const int ThisTask, const int filenr, struct forest_info *forests_info);
 static void sage_per_forest(const int filenr, const int forestnr, const int nhalos, int *TotGalaxies, int **ForestNgals, FILE **save_fd, int *interrupted, struct forest_info *forests_info);
 
 void init_sage(const int ThisTask, const char *param_file)
@@ -24,8 +24,13 @@ void init_sage(const int ThisTask, const char *param_file)
     init(ThisTask);
 }
 
-void sage(const int ThisTask, const int NTasks)
+void run_sage(const int ThisTask, const int NTasks)
 {
+    struct forest_info forests_info;
+    memset(&forests_info, 0, sizeof(struct forest_info));
+    forests_info.nforests = 0;
+    forests_info.nsnapshots = 0;
+    forests_info.totnhalos_per_forest = NULL;
 
 #ifdef MPI
     for(int filenr = run_params.FirstFile+ThisTask; filenr <= run_params.LastFile; filenr += NTasks) {
@@ -34,19 +39,16 @@ void sage(const int ThisTask, const int NTasks)
     for(int filenr = run_params.FirstFile; filenr <= run_params.LastFile; filenr++) {
 #endif
         /* run the sage model on all trees within the file*/
-        sage_per_file(ThisTask, filenr);
+        sage_per_file(ThisTask, filenr, &forests_info);
     }
 
-}
-
-
-void finalize_sage(void)
-{
-
+    /* sage is done running -> do the cleanup */
+    cleanup_forests_io(run_params.TreeType, &forests_info);
+    
 #if 0
     if(HDF5Output) {
         free_hdf5_ids();
-      
+        
 #ifdef MPI
         // Create a single master HDF5 file with links to the other files...
         MPI_Barrier(MPI_COMM_WORLD);
@@ -55,32 +57,23 @@ void finalize_sage(void)
             write_master_file();
     }
 #endif /* commented out the section for hdf5 output */    
-
+    
     //free Ages. But first
     //reset Age to the actual allocated address
     run_params.Age--;
-    myfree(run_params.Age);                              
-    
+    myfree(run_params.Age);
 }
 
 
-
 /* Main sage -> not exposed externally */ 
-static void sage_per_file(const int ThisTask, const int filenr)
+static void sage_per_file(const int ThisTask, const int filenr, struct forest_info *forests_info)
 {
 
-    struct forest_info forests_info;
-    memset(&forests_info, 0, sizeof(struct forest_info));
+    snprintf(forests_info->filename, 4*MAX_STRING_LEN, "%s/%s.%d%s", run_params.SimulationDir, run_params.TreeName, filenr, run_params.TreeExtension);
 
-    forests_info.nforests = 0;
-    forests_info.nsnapshots = 0;
-    forests_info.totnhalos_per_forest = NULL;
-    forests_info.nhalos_per_forest_per_snapshot = NULL;
-    snprintf(forests_info.filename, 4*MAX_STRING_LEN, "%s/%s.%d%s", run_params.SimulationDir, run_params.TreeName, filenr, run_params.TreeExtension);
-
-    FILE *fd = fopen(forests_info.filename, "r");
+    FILE *fd = fopen(forests_info->filename, "r");
     if (fd == NULL) {
-        printf("-- missing tree %s ... skipping\n", forests_info.filename);
+        printf("-- missing tree %s ... skipping\n", forests_info->filename);
         return;
     } else {
         fclose(fd);
@@ -104,8 +97,8 @@ static void sage_per_file(const int ThisTask, const int filenr)
     int *ForestNgals[ABSOLUTEMAXSNAPS] = { NULL };
     FILE* save_fd[ABSOLUTEMAXSNAPS] = { NULL };
     
-    load_forest_table(run_params.TreeType, &forests_info);
-    const int Nforests = forests_info.nforests;
+    load_forest_table(run_params.TreeType, forests_info);
+    const int Nforests = forests_info->nforests;
     
     /* allocate memory for the number of galaxies at each output snapshot */
     for(int n = 0; n < run_params.NOUT; n++) {
@@ -126,19 +119,19 @@ static void sage_per_file(const int ThisTask, const int filenr)
         if(ThisTask == 0) {
             my_progressbar(stderr, forestnr, &interrupted);
         }
-        const int nhalos = forests_info.totnhalos_per_forest[forestnr];
+        const int nhalos = forests_info->totnhalos_per_forest[forestnr];
         
         /* the millennium tree is really a collection of trees, viz., a forest */
-        sage_per_forest(filenr, forestnr, nhalos, TotGalaxies, ForestNgals, save_fd, &interrupted, &forests_info);
+        sage_per_forest(filenr, forestnr, nhalos, TotGalaxies, ForestNgals, save_fd, &interrupted, forests_info);
     }
     
     finalize_galaxy_file(Nforests, (const int *) TotGalaxies, (const int **) ForestNgals, save_fd);
-    free_forest_table(run_params.TreeType, &forests_info);
+    free_forest_table(run_params.TreeType, forests_info);
 
     for(int n = 0; n < run_params.NOUT; n++) {
         myfree(ForestNgals[n]);
     }
-    myfree(forests_info.totnhalos_per_forest);
+    myfree(forests_info->totnhalos_per_forest);
     
     if(ThisTask == 0) {
         finish_myprogressbar(stderr, &interrupted);
