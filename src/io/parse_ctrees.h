@@ -270,7 +270,7 @@ static inline int parse_header_ctrees(char (*column_names)[PARSE_CTREES_MAX_COLN
                              totncols, col);
         free(tofree);
 
-        int * matched_columns = match_column_name(column_names, nfields, names, totncols);
+        int * matched_columns = match_column_name((const char (*)[PARSE_CTREES_MAX_COLNAME_LEN])column_names, nfields, (const char (*)[PARSE_CTREES_MAX_COLNAME_LEN]) names, totncols);
         if(matched_columns == NULL) {
             return EXIT_FAILURE;
         }
