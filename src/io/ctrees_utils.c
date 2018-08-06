@@ -60,6 +60,7 @@ int64_t read_forests(const char *filename, int64_t **f, int64_t **t)
             ntrees_found++;tree_roots++;forests++;
         }
     }
+    fclose(fp);
     XASSERT(ntrees == ntrees_found, -1,
             "ntrees=%"PRId64" should be equal to ntrees_found=%"PRId64"\n", ntrees, ntrees_found);
     
