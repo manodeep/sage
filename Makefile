@@ -14,6 +14,7 @@ LIBSRC :=  sage.c core_read_parameter_file.c core_init.c core_io_tree.c \
            model_disk_instability.c model_reincorporation.c model_mergers.c model_misc.c \
            io/read_tree_binary.c io/read_tree_consistentrees_ascii.c io/ctrees_utils.c 
 LIBINCL := $(LIBSRC:.c=.h)
+LIBINCL += io/parse_ctrees.h 
 
 SRC := main.c $(LIBSRC)
 SRC  := $(addprefix $(SRC_PREFIX)/, $(SRC))
@@ -175,6 +176,8 @@ $(EXEC): $(OBJS)
 
 %.o: %.c $(INCL) Makefile
 	$(CC) $(OPTS) $(OPTIMIZE) $(CCFLAGS) -c $< -o $@
+
+$(LIBOBJS): $(LIBSRC) $(LIBINCL)
 
 $(SAGELIB): $(LIBOBJS)
 	ar rcs $@ $(LIBOBJS) 

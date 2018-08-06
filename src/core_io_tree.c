@@ -19,7 +19,7 @@
 #include "io/read_tree_genesis_standard_hdf5.h"
 #endif
 
-void load_forest_table(const enum Valid_TreeTypes my_TreeType, struct forest_info *forests_info)
+void setup_forests_io(const enum Valid_TreeTypes my_TreeType, struct forest_info *forests_info)
 {
     switch (my_TreeType)
         {
@@ -49,39 +49,8 @@ void load_forest_table(const enum Valid_TreeTypes my_TreeType, struct forest_inf
 
 }
 
-void free_forest_table(enum Valid_TreeTypes my_TreeType, struct forest_info *forests_info)
-{
-    /* Don't forget to free the open file handle */
-    switch (my_TreeType) {
-#ifdef HDF5
-    case genesis_lhalo_hdf5:
-        close_hdf5_file(forests_info);
-        break;
-        
-    case genesis_standard_hdf5:
-        close_genesis_hdf5_file(forests_info);
-        break;
-            
-#endif
-            
-    case lhalo_binary:
-        close_binary_file(forests_info);
-        break;
-        
-    case consistent_trees_ascii:
-        close_ctrees_file(forests_info);
-        break;
 
-    default:
-        fprintf(stderr, "Your tree type has not been included in the switch statement for function ``%s`` in file ``%s``.\n", __FUNCTION__, __FILE__);
-        fprintf(stderr, "Please add it there.\n");
-        ABORT(EXIT_FAILURE);
-        
-    }
-}
-
-
-
+/* This routine is to be called after *ALL* forests have been processed */
 void cleanup_forests_io(enum Valid_TreeTypes my_TreeType, struct forest_info *forests_info)
 {
     /* Don't forget to free the open file handle */
@@ -114,6 +83,39 @@ void cleanup_forests_io(enum Valid_TreeTypes my_TreeType, struct forest_info *fo
 
     return;
 }
+
+/* This routine is to be called after all forests in ONE file have been processed*/
+void cleanup_forests_io_per_file(enum Valid_TreeTypes my_TreeType, struct forest_info *forests_info)
+{
+    /* Don't forget to free the open file handle */
+    switch (my_TreeType) {
+#ifdef HDF5
+    case genesis_lhalo_hdf5:
+        close_hdf5_file(forests_info);
+        break;
+        
+    case genesis_standard_hdf5:
+        close_genesis_hdf5_file(forests_info);
+        break;
+#endif
+            
+    case lhalo_binary:
+        cleanup_forests_io_per_file_binary(forests_info);
+        break;
+        
+    case consistent_trees_ascii:
+        break;
+
+    default:
+        fprintf(stderr, "Your tree type has not been included in the switch statement for function ``%s`` in file ``%s``.\n", __FUNCTION__, __FILE__);
+        fprintf(stderr, "Please add it there.\n");
+        ABORT(EXIT_FAILURE);
+        
+    }
+
+    return;
+}
+
 
 void load_forest(const int forestnr, const int nhalos, enum Valid_TreeTypes my_TreeType, struct halo_data **halos, struct forest_info *forests_info)
 {

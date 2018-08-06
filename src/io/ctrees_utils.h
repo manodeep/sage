@@ -9,14 +9,14 @@ extern "C" {
     struct locations_with_forests {
         int64_t forestid;
         int64_t treeid;
-        int64_t offset;
+        int64_t offset;/* byte offset in the file where the tree data begin (i.e., the next line after "#tree TREE_ROOT_ID\n" */
         int64_t fileid;
     };
 
     struct filenames_and_fd {
-        int *fd;
-        int32_t numfiles;
-        uint32_t nallocated;
+        int *fd;/* file descriptor for each file output by CTrees*/
+        int32_t numfiles;/* total number of unique `tree_*_*_*.dat` files */
+        uint32_t nallocated;/* number of elements allocated for the first `int *fd` field */
     };
 
     struct additional_info{
@@ -31,7 +31,7 @@ extern "C" {
     /* externally exposed functions */
     extern int64_t read_forests(const char *filename, int64_t **forestids, int64_t **tree_rootids);
     extern int64_t read_locations(const char *filename, const int64_t ntrees, struct locations_with_forests *l, struct filenames_and_fd *filenames_and_fd);
-    extern void assign_forest_ids(const int64_t ntrees, struct locations_with_forests *locations, int64_t *forests, int64_t *tree_roots);
+    extern int assign_forest_ids(const int64_t ntrees, struct locations_with_forests *locations, int64_t *forests, int64_t *tree_roots);
     extern void sort_locations_on_fid_file_offset(const int64_t ntrees, struct locations_with_forests *locations);
     extern int fix_flybys(const int64_t totnhalos, struct halo_data *forest, struct additional_info *info, int verbose);
     extern int fix_upid(const int64_t totnhalos, struct halo_data *forest, struct additional_info *info, int *interrupted, const int verbose);

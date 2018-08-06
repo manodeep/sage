@@ -15,10 +15,12 @@
 #include "../sglib.h"
 
 #include "ctrees_utils.h"
+#include "parse_ctrees.h"
 
 int CTREES_UPID_FEATURE = 0;
 
 int64_t find_fof_halo(const int64_t totnhalos, const struct additional_info *info, const int start_loc, const int64_t upid, int verbose, int64_t calldepth);
+
 
 int64_t read_forests(const char *filename, int64_t **f, int64_t **t)
 {
@@ -49,16 +51,16 @@ int64_t read_forests(const char *filename, int64_t **f, int64_t **t)
             continue;
         } else {
             const int nitems_expected = 2;
-            XASSERT(ntrees_found < ntrees, EXIT_FAILURE,
+            XASSERT(ntrees_found < ntrees, -1,
                     "ntrees=%"PRId64" should be less than ntrees_found=%"PRId64"\n", ntrees, ntrees_found);            
             int nitems = sscanf(buffer, "%"SCNd64" %"SCNd64, tree_roots, forests);
-            XASSERT(nitems == nitems_expected, EXIT_FAILURE,
+            XASSERT(nitems == nitems_expected, -1,
                     "Expected to parse %d long integers but found `%s' in the buffer. nitems = %d \n",
                     nitems_expected, buffer, nitems);
-            ntrees_found++;
+            ntrees_found++;tree_roots++;forests++;
         }
     }
-    XASSERT(ntrees == ntrees_found, EXIT_FAILURE,
+    XASSERT(ntrees == ntrees_found, -1,
             "ntrees=%"PRId64" should be equal to ntrees_found=%"PRId64"\n", ntrees, ntrees_found);
     
     return ntrees;
@@ -72,9 +74,18 @@ int64_t read_locations(const char *filename, const int64_t ntrees, struct locati
     const char comment = '#';
     /* By passing the comment character, getnumlines
        will return the actual number of lines, ignoring
-       the first header line. 
-     */
+       the first header line. */
 
+    char dirname[MAX_STRING_LEN];
+    memset(dirname, '\0', MAX_STRING_LEN);
+    memcpy(dirname, filename, strlen(filename));
+    for(int i=MAX_STRING_LEN-2;i>=0;i--) {
+        if(dirname[i] == '/') {
+            dirname[i] = '\0';
+            break;
+        }
+    }
+    
     struct filenames_and_fd *files_fd = filenames_and_fd;
     uint32_t numfiles_allocated = 2000;
     files_fd->fd = calloc(numfiles_allocated, sizeof(files_fd->fd[0]));
@@ -100,14 +111,14 @@ int64_t read_locations(const char *filename, const int64_t ntrees, struct locati
             XASSERT(ntrees_found < ntrees, EXIT_FAILURE,
                     "ntrees=%"PRId64" should be less than ntrees_found=%"PRId64"\n",
                     ntrees, ntrees_found);            
-            int nitems = sscanf(buffer, "%"SCNd64" %"SCNd64 " %"SCNd64 "%s", &(locations[ntrees_found].treeid),
-                                &(locations[ntrees_found].fileid), &(locations[ntrees_found].offset), linebuf);
+            int nitems = sscanf(buffer, "%"SCNd64" %"SCNd64 " %"SCNd64 "%s", &locations->treeid,
+                                &locations->fileid, &locations->offset, linebuf);
 
-            XASSERT(locations[ntrees_found].offset >= 0, INVALID_VALUE_READ_FROM_FILE, 
+            XASSERT(locations->offset >= 0, INVALID_VALUE_READ_FROM_FILE, 
                     "offset=%"PRId64" for ntree =%"PRId64" must be positive.\nFile = `%s'\nbuffer = `%s'\n",
-                    locations[ntrees_found].offset,ntrees_found,filename, buffer);
+                    locations->offset, ntrees_found, filename, buffer);
             
-            const size_t fileid = locations[ntrees_found].fileid;
+            const size_t fileid = locations->fileid;
             if(fileid > files_fd->nallocated) {
                 numfiles_allocated *= 2;
                 int *new_fd = realloc(files_fd->fd, numfiles_allocated*sizeof(files_fd->fd[0]));
@@ -126,18 +137,22 @@ int64_t read_locations(const char *filename, const int64_t ntrees, struct locati
             
             /* file has not been opened yet - let's open this file */
             if(files_fd->fd[fileid] < 0) {
-                files_fd->fd[fileid] = open(linebuf, O_RDONLY);
-                XASSERT( files_fd->fd[fileid] > 0, FILE_NOT_FOUND, "Error: Could not open file `%s'\n", linebuf);
+                char treefilename[MAX_STRING_LEN];
+                snprintf(treefilename, MAX_STRING_LEN-1, "%s/%s", dirname, linebuf); 
+                files_fd->fd[fileid] = open(treefilename, O_RDONLY);
+                XASSERT( files_fd->fd[fileid] > 0, FILE_NOT_FOUND, "Error: Could not open file `%s'\n", treefilename);
                 files_fd->numfiles++;
             }
             
             XASSERT(nitems == nitems_expected, EXIT_FAILURE, "Expected to parse two long integers but found `%s' in the buffer\n", buffer);
             ntrees_found++;
+            locations++;
         }
     }
     XASSERT(ntrees == ntrees_found, EXIT_FAILURE, "ntrees=%"PRId64" should be equal to ntrees_found=%"PRId64"\n", ntrees, ntrees_found);
     fclose(fp);
 
+    locations = l;
     for(int64_t i=0;i<ntrees_found;i++){
         if (locations[i].fileid > max_fileid) {
             max_fileid = locations[i].fileid;
@@ -159,11 +174,13 @@ int64_t read_locations(const char *filename, const int64_t ntrees, struct locati
 }    
 
 
-void sort_forests(const int64_t ntrees, int64_t *forests, int64_t *treeids)
+void sort_forests_by_treeid(const int64_t ntrees, int64_t *forests, int64_t *treeids)
 {
 
-#define MULTIPLE_ARRAY_EXCHANGER(type,a,i,j) { SGLIB_ARRAY_ELEMENTS_EXCHANGER(int64_t, treeids,i,j); \
-        SGLIB_ARRAY_ELEMENTS_EXCHANGER(int64_t, forests, i, j) }
+#define MULTIPLE_ARRAY_EXCHANGER(type,a,i,j) {                      \
+        SGLIB_ARRAY_ELEMENTS_EXCHANGER(int64_t, treeids,i, j);      \
+        SGLIB_ARRAY_ELEMENTS_EXCHANGER(int64_t, forests, i, j);     \
+    }
     
     SGLIB_ARRAY_QUICK_SORT(int64_t, treeids, ntrees, SGLIB_NUMERIC_COMPARATOR , MULTIPLE_ARRAY_EXCHANGER);
 #undef MULTIPLE_ARRAY_EXCHANGER
@@ -174,7 +191,7 @@ int compare_locations_treeids(const void *l1, const void *l2)
 {
     const struct locations_with_forests *aa = (const struct locations_with_forests *) l1;
     const struct locations_with_forests *bb = (const struct locations_with_forests *) l2;
-    return (aa->treeid < bb->treeid) ? -1:1;
+    return (aa->treeid < bb->treeid) ? -1:(aa->treeid==bb->treeid ? 0:1);
 }
 
 int compare_locations_fid(const void *l1, const void *l2)
@@ -242,10 +259,10 @@ void sort_locations_on_fid_file_offset(const int64_t ntrees, struct locations_wi
 }    
 
 
-void assign_forest_ids(const int64_t ntrees, struct locations_with_forests *locations, int64_t *forests, int64_t *treeids)
+int assign_forest_ids(const int64_t ntrees, struct locations_with_forests *locations, int64_t *forests, int64_t *treeids)
 {
     /* Sort forests by tree roots -> necessary for assigning forest ids */
-    sort_forests(ntrees, forests, treeids);
+    sort_forests_by_treeid(ntrees, forests, treeids);
     sort_locations_on_treeroot(ntrees, locations);    
     
     /* forests and treeids are sorted together, on treeids */
@@ -256,6 +273,8 @@ void assign_forest_ids(const int64_t ntrees, struct locations_with_forests *loca
                 i, treeids[i], locations[i].treeid);
         locations[i].forestid = forests[i];
     }
+
+    return EXIT_SUCCESS;
 }    
 
 
@@ -378,10 +397,38 @@ int fix_upid(const int64_t totnhalos, struct halo_data *forest, struct additiona
         
         /* Only (sub)subhalos should reach here */
         /*Check if upid points to host halo with pid == -1*/
-        const int64_t upid = info[i].upid;
+        int64_t upid = info[i].upid;
         int64_t calldepth=0;
-        /* fprintf(stderr,"CALLING FIND FOF HALO with i = %"PRId64" id = %"PRId64" upid = %"PRId64"\n", i, info[i].id, upid); */
-        const int64_t loc = find_fof_halo(totnhalos, info, i, upid, verbose, calldepth);
+        if(verbose) {
+            fprintf(stderr,"CALLING FIND FOF HALO with i = %"PRId64" id = %"PRId64" upid = %"PRId64"\n", i, info[i].id, upid);
+        }
+        int64_t loc = find_fof_halo(totnhalos, info, i, upid, verbose, calldepth);
+        while(loc < 0 || loc >= totnhalos) {
+            fprintf(stderr, "looping to locate fof halo for i = %"PRId64" id = %"PRId64" upid = %"PRId64" loc=%"PRId64"\n",
+                    i, info[i].id, upid, loc);
+            int64_t track_id = upid;
+            int found = 0;
+            for(int64_t j=0;j<totnhalos;j++) {
+                if(info[j].id == track_id) {
+                    found = 1;
+                    fprintf(stderr,"found track_id = %"PRId64" pid = %"PRId64" upid = %"PRId64"\n", track_id, info[j].pid, info[j].upid);
+                    if(info[j].pid == -1) {
+                        loc = j;
+                        break;
+                    } else {
+                        track_id = info[j].pid;
+                    }
+                    break;
+                }
+            }
+            XASSERT( found == 1, EXIT_FAILURE,
+                     "Error: Could not locate FOF halo for halo with id = %"PRId64" and upid = %"PRId64"\n",
+                     info[i].id, upid);
+        }
+        if(verbose) {
+            fprintf(stderr,"found FOF halo for halnum = %"PRId64". loc = %"PRId64" id = %"PRId64" upid = %"PRId64"\n",
+                    i, loc, info[loc].id, info[loc].upid);
+        }
         XASSERT(loc >=0 && loc < totnhalos, EXIT_FAILURE, 
                 "could not locate fof halo for i = %"PRId64" id = %"PRId64" upid = %"PRId64" loc=%"PRId64"\n",
                 i, info[i].id, upid, loc);
@@ -391,6 +438,10 @@ int fix_upid(const int64_t totnhalos, struct halo_data *forest, struct additiona
                     i, upid, new_upid);
             CTREES_UPID_FEATURE = 1;
             *interrupted = 1;
+        }
+        if(verbose) {
+            fprintf(stderr,"setting upid/pid for halonum = %"PRId64" to %"PRId64". previously: pid = %"PRId64" upid = %"PRId64". id = %"PRId64"\n",
+                    i, new_upid, info[i].pid, info[i].upid, info[i].id); 
         }
         info[i].upid = new_upid;
         info[i].pid  = new_upid;
@@ -622,31 +673,24 @@ int64_t find_fof_halo(const int64_t totnhalos, const struct additional_info *inf
     XASSERT(totnhalos < INT_MAX, EXIT_FAILURE, 
             "Totnhalos must be less than %d. Otherwise indexing with int (start_loc) will break\n", INT_MAX);
     int64_t loc = -1;
-    const int64_t max_recursion_depth = 30, recursion_depth_for_verbose = 3;
-
     if(info[start_loc].pid == -1) {
-        return start_loc;
+        return start_loc;/* should never be called to find the FOF of a FOF halo -> but whatever*/
     }
+
+    const int64_t max_recursion_depth = 30, recursion_depth_for_verbose = 3;
     if(calldepth >= recursion_depth_for_verbose) {
         verbose = 1;
     }
-    XASSERT( calldepth <= max_recursion_depth, EXIT_FAILURE,
-             "calldepth = %"PRId64" has exceeded a max. recursion depth of %"PRId64". Needs a closer look at the halos involved (likely- caught in infinite loop currently)",
-             calldepth, max_recursion_depth);
+    XASSERT(calldepth <= max_recursion_depth, EXIT_FAILURE,
+            "%s has been recursively called %"PRId64" times already. Likely caught in infinite loop..exiting\n",
+            __FUNCTION__, calldepth);
 
     while(start_loc >= 0 && start_loc < totnhalos && info[start_loc].pid != -1) {
-
-        /* if(info[start_loc].id == 3058456321) { */
-        /*     fprintf(stderr,"info[%d].id = 3058456321. pid = %"PRId64" upid = %"PRId64"\n", */
-        /*             start_loc, info[start_loc].pid, info[start_loc].upid); */
-        /* } */
-
-
-        /* if(verbose == 1) { */
-        /*     fprintf(stderr,"start_loc = %d id = %"PRId64" pid = %"PRId64"\n", start_loc, info[start_loc].id, info[start_loc].pid); */
-        /*     fprintf(stderr,"scale = %lf pid = %"PRId64" upid = %"PRId64"\n", */
-        /*             info[start_loc].scale, info[start_loc].pid, info[start_loc].upid); */
-        /* } */
+        if(verbose == 1) {
+            fprintf(stderr,"start_loc = %d id = %"PRId64" pid = %"PRId64"\n", start_loc, info[start_loc].id, info[start_loc].pid);
+            fprintf(stderr,"scale = %lf pid = %"PRId64" upid = %"PRId64"\n",
+                    info[start_loc].scale, info[start_loc].pid, info[start_loc].upid);
+        }
         if(upid > info[start_loc].id) {
             for(int64_t k=start_loc+1;k<totnhalos;k++) {
                 if(info[k].id == upid) {
@@ -663,17 +707,17 @@ int64_t find_fof_halo(const int64_t totnhalos, const struct additional_info *inf
             }
         }
 
-        if( ! (loc >= 0 && loc < totnhalos) ) {
+        if( loc < 0 || loc >= totnhalos) {
             return -1;
         }
         if(info[loc].pid == -1) {
             return loc;
         } else {
-            /* if(verbose == 1) { */
-            /*     fprintf(stderr,"calling find_fof_halo again with loc =%"PRId64" (int) loc = %d start_loc was =%d\n",loc, (int) loc, start_loc); */
-            /*     fprintf(stderr,"scale = %lf id = %"PRId64" pid = %"PRId64" upid = %"PRId64" calldepth=%"PRId64"\n", */
-            /*             info[loc].scale, info[loc].id, info[loc].pid, info[loc].upid,calldepth); */
-            /* } */
+            if(verbose == 1) {
+                fprintf(stderr,"calling find_fof_halo again with loc =%"PRId64" (int) loc = %d start_loc was =%d\n",loc, (int) loc, start_loc);
+                fprintf(stderr,"scale = %lf id = %"PRId64" pid = %"PRId64" upid = %"PRId64" calldepth=%"PRId64"\n",
+                        info[loc].scale, info[loc].id, info[loc].pid, info[loc].upid,calldepth);
+            }
             calldepth++;
             return find_fof_halo(totnhalos, info, (int) loc, info[loc].upid, verbose, calldepth);
         }

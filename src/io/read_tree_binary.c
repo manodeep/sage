@@ -87,7 +87,8 @@ void load_forest_binary(const int32_t forestnr, struct halo_data **halos, struct
     *halos = local_halos;
 }
 
-void close_binary_file(struct forest_info *forests_info)
+
+void cleanup_forests_io_per_file_binary(struct forest_info *forests_info)
 {
 #ifdef USE_FWRITE
     if(forests_info->fp != NULL) {
@@ -104,7 +105,10 @@ void close_binary_file(struct forest_info *forests_info)
         free(forests_info->lht.bytes_offset_for_forest);
     }
 #endif
+
+    myfree(forests_info->totnhalos_per_forest);
 }
+
 
 
 

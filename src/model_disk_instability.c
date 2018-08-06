@@ -42,17 +42,17 @@ void check_disk_instability(const int p, const int centralgal, const int halonr,
             // galaxies[p].mergeType = 3;  // mark as disk instability partial mass transfer
             // galaxies[p].mergeIntoID = NumGals + p - 1;      
           
-            if (galaxies[p].BulgeMass / galaxies[p].StellarMass > 1.0001 || galaxies[p].MetalsBulgeMass / galaxies[p].MetalsStellarMass > 1.0001) {
+            if((galaxies[p].BulgeMass >  1.0001 * galaxies[p].StellarMass)  || (galaxies[p].MetalsBulgeMass >  1.0001 * galaxies[p].MetalsStellarMass)) {
                 printf("Instability: Mbulge > Mtot (stars or metals)\n");
-                // ABORT(0);
+                //ABORT(EXIT_FAILURE);
             }
         }
 
         // burst excess gas and feed black hole (really need a dedicated model for bursts and BH growth here)
         if(unstable_gas > 0.0) {
-            if(unstable_gas/galaxies[p].ColdGas > 1.0001) {
+            if(unstable_gas > 1.0001 * galaxies[p].ColdGas ) {
                 printf("unstable_gas > galaxies[p].ColdGas\t%e\t%e\n", unstable_gas, galaxies[p].ColdGas);
-                // ABORT(0);
+                // ABORT(EXIT_FAILURE);
             }
           
             const double unstable_gas_fraction = unstable_gas / galaxies[p].ColdGas;

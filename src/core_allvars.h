@@ -210,6 +210,7 @@ enum sage_error_types {
     INVALID_FILE_POINTER,
     INVALID_FILE_DESCRIPTOR,
     INVALID_VALUE_READ_FROM_FILE,
+    PARSE_ERROR,
 };
 
 struct lhalotree_info {
@@ -225,6 +226,8 @@ struct ctrees_tree_level_info {
 struct ctrees_info {
     int64_t nforests;//redundant but helps with the coding
 
+    void *column_info;/* stored as a void * to avoid including the parse_ctrees.h*/
+    
     /* forest level quantities */
     int64_t *ntrees_per_forest;/* contains nforests elements */
     int64_t *start_treenum_per_forest;/* contains nforests elements */

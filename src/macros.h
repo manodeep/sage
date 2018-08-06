@@ -22,6 +22,7 @@
         printf("Error in file: %s\tfunc: %s\tline: %i\n", __FILE__, __FUNCTION__, __LINE__); \
         printf("exit code = %d\n", sigterm);                            \
         perror(NULL);                                                   \
+        exit(sigterm);                                                  \
     } while(0)
 
 

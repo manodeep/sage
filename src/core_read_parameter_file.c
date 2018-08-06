@@ -7,7 +7,7 @@
 #include "core_allvars.h"
 #include "core_mymalloc.h"
 
-void read_parameter_file(const int ThisTask, const char *fname)
+int read_parameter_file(const int ThisTask, const char *fname)
 {
     int errorFlag = 0;
     int *used_tag = 0;
@@ -188,7 +188,7 @@ void read_parameter_file(const int ThisTask, const char *fname)
     FILE *fd = fopen(fname, "r");
     if (fd == NULL) {
         printf("Parameter file %s not found.\n", fname);
-        errorFlag = 1;
+        return FILE_NOT_FOUND;
     }
   
     if(fd != NULL) {
@@ -307,11 +307,12 @@ void read_parameter_file(const int ThisTask, const char *fname)
 
     /* because in the default case of 'lhalo-binary', nothing
        gets written to "treeextension", we need to 
-       null terminate tree-extension first
-     */
+       null terminate tree-extension first  */
     run_params.TreeExtension[0] = '\0';
     // Check file type is valid. 
-    if (strncmp(my_treetype, "lhalo_binary", 511) != 0) { // strncmp returns 0 if the two strings are equal. Only available options are HDF5 or binary files. 
+    if (strncmp(my_treetype, "genesis_lhalo_hdf5", 511) == 0) {
+        // strncmp returns 0 if the two strings are equal.
+        // only relevant options are HDF5 or binary files. Consistent-trees is *always* ascii (with different filename extensions)
         snprintf(run_params.TreeExtension, 511, ".hdf5");
 #ifndef HDF5
         fprintf(stderr, "You have specified to use a HDF5 file but have no compiled with the HDF5 option enabled.\n");
@@ -320,17 +321,30 @@ void read_parameter_file(const int ThisTask, const char *fname)
 #endif
     }
 
-    // Recast the local treetype string to a global TreeType enum.
-    if (strcasecmp(my_treetype, "genesis_lhalo_hdf5") == 0) {
-        run_params.TreeType = genesis_lhalo_hdf5;
-    } else if (strcasecmp(my_treetype, "lhalo_binary") == 0) {
-        run_params.TreeType = lhalo_binary;
-    } else {
-        fprintf(stderr, "TreeType %s is not supported\n", my_treetype);
-        ABORT(0);
+    const char tree_names[][MAX_STRING_LEN] = {"genesis_lhalo_hdf5", "lhalo_binary", "consistent_trees_ascii"};
+    const char tree_enums[] = {genesis_lhalo_hdf5, lhalo_binary, consistent_trees_ascii};
+    const int nvalid_tree_types  = sizeof(tree_names)/(MAX_STRING_LEN*sizeof(char));
+    XASSERT(nvalid_tree_types == 3, EXIT_FAILURE, "nvalid_tree_types = %d should have been 3\n", nvalid_tree_types);
+    int found = 0;
+    for(int i=0;i<nvalid_tree_types;i++) {
+        if (strcasecmp(my_treetype, tree_names[i]) == 0) {
+            run_params.TreeType = tree_enums[i];
+            found = 1;
+            break;
+        }
     }
-
+    
+    if(found == 0) {
+        fprintf(stderr, "TreeType %s is not supported\n", my_treetype);
+        fprintf(stderr," Please choose one of the supported tree types -- \n");
+        for(int i=0;i<nvalid_tree_types;i++) {
+            fprintf(stderr,"TreeType = %s\n", tree_names[i]);
+        }
+        ABORT(EXIT_FAILURE);
+    }
     myfree(used_tag);
-  
+
+    
+    return EXIT_SUCCESS;
 }
 
