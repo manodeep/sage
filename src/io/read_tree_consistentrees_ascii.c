@@ -71,24 +71,24 @@ int load_forest_table_ctrees(struct forest_info *forests_info)
     struct ctrees_info *ctr = &(forests_info->ctr);
     
     forests_info->nforests = nforests;
-    forests_info->totnhalos_per_forest = calloc(nforests, sizeof(forests_info->totnhalos_per_forest[0]));
+    forests_info->totnhalos_per_forest = mymalloc(nforests * sizeof(forests_info->totnhalos_per_forest[0]));
     XASSERT(forests_info->totnhalos_per_forest != NULL, MALLOC_FAILURE,
             "Error: Could not allocate memory for storing nhalos per %"PRId64" forests, each of size = %zu bytes\n",
             nforests, sizeof(forests_info->totnhalos_per_forest[0]));
     ctr->nforests = nforests;
-    ctr->ntrees_per_forest = calloc(nforests, sizeof(ctr->ntrees_per_forest[0]));
+    ctr->ntrees_per_forest = mymalloc(nforests * sizeof(ctr->ntrees_per_forest[0]));
     XASSERT(ctr->ntrees_per_forest != NULL, MALLOC_FAILURE, "Error: Could not allocate memory to store the number of trees per forest\n"
             "nforests = %"PRId64". Total number of bytes = %"PRIu64"\n",nforests, nforests*sizeof(ctr->ntrees_per_forest[0]));
 
-    ctr->start_treenum_per_forest = calloc(nforests, sizeof(ctr->start_treenum_per_forest[0]));
+    ctr->start_treenum_per_forest = mymalloc(nforests * sizeof(ctr->start_treenum_per_forest[0]));
     XASSERT(ctr->start_treenum_per_forest != NULL, MALLOC_FAILURE, "Error: Could not allocate memory to store the starting tree number per forest\n"
             "nforests = %"PRId64". Total number of bytes = %"PRIu64"\n",nforests, nforests*sizeof(ctr->start_treenum_per_forest[0]));
 
-    ctr->tree_offsets = calloc(ntrees, sizeof(ctr->tree_offsets[0]));
+    ctr->tree_offsets = mymalloc(ntrees * sizeof(ctr->tree_offsets[0]));
     XASSERT(ctr->tree_offsets != NULL, MALLOC_FAILURE, "Error: Could not allocate memory to store the file offset (in bytes) per tree\n"
             "ntrees = %"PRId64". Total number of bytes = %"PRIu64"\n",ntrees, ntrees*sizeof(ctr->tree_offsets[0]));
 
-    ctr->tree_fd = calloc(ntrees, sizeof(ctr->tree_fd[0]));
+    ctr->tree_fd = mymalloc(ntrees * sizeof(ctr->tree_fd[0]));
     XASSERT(ctr->tree_fd != NULL, MALLOC_FAILURE, "Error: Could not allocate memory to store the file descriptor per tree\n"
             "ntrees = %"PRId64". Total number of bytes = %"PRIu64"\n",ntrees, ntrees*sizeof(ctr->tree_fd[0]));
 
@@ -125,7 +125,7 @@ int load_forest_table_ctrees(struct forest_info *forests_info)
     free(locations);
 
     ctr->numfiles = files_fd.numfiles;
-    ctr->open_fds = calloc(ctr->numfiles, sizeof(ctr->open_fds[0]));
+    ctr->open_fds = mymalloc(ctr->numfiles * sizeof(ctr->open_fds[0]));
     XASSERT(ctr->open_fds != NULL, MALLOC_FAILURE, "Error: Could not allocate memory to store the file descriptor per file\n"
             "numfiles = %"PRId64". Total number of bytes = %"PRIu64"\n",ctr->numfiles, ctr->numfiles*sizeof(ctr->open_fds[0]));
 
@@ -135,7 +135,7 @@ int load_forest_table_ctrees(struct forest_info *forests_info)
     free(files_fd.fd);
 
     /* Now need to parse the header to figure out which columns go where ... */
-    ctr->column_info = calloc(1, sizeof(struct ctrees_column_to_ptr));
+    ctr->column_info = mymalloc(1 * sizeof(struct ctrees_column_to_ptr));
     XASSERT(ctr->column_info != NULL, EXIT_FAILURE,
             "Error: Could not allocate memory to store the column_info struct of size = %zu bytes\n",
             sizeof(struct ctrees_column_to_ptr));
@@ -222,12 +222,12 @@ int load_forest_ctrees(const int32_t forestnr, struct halo_data **halos, struct 
     const int64_t default_nhalos_per_tree = 1000;/* allocate for a 100k halos per tree by default */
     int64_t nhalos_allocated = default_nhalos_per_tree * ntrees;
 
-    *halos = mycalloc(nhalos_allocated, sizeof(struct halo_data));
+    *halos = mymalloc(nhalos_allocated * sizeof(struct halo_data));
     XASSERT( *halos != NULL, MALLOC_FAILURE, "Error: Could not allocate memory to store halos\n"
              "ntrees = %"PRId64" nhalos_allocated = %"PRId64". Total number of bytes = %"PRIu64"\n",
              ntrees, nhalos_allocated, nhalos_allocated*sizeof(struct halo_data));
     
-    struct additional_info *info = mycalloc(nhalos_allocated, sizeof(struct additional_info));
+    struct additional_info *info = mymalloc(nhalos_allocated * sizeof(struct additional_info));
     XASSERT( info != NULL, MALLOC_FAILURE, "Error: Could not allocate memory to store additional info per halo\n"
              "ntrees = %"PRId64" nhalos_allocated = %"PRId64". Total number of bytes = %"PRIu64"\n",
              ntrees, nhalos_allocated, nhalos_allocated*sizeof(info[0]));
@@ -361,16 +361,16 @@ void close_ctrees_file(struct forest_info *forests_info)
 void cleanup_forests_io_ctrees(struct forest_info *forests_info)
 {
     struct ctrees_info *ctr = &(forests_info->ctr);
-    free(forests_info->totnhalos_per_forest);
-    free(ctr->ntrees_per_forest);
-    free(ctr->start_treenum_per_forest);
-    free(ctr->tree_offsets);
-    free(ctr->tree_fd);
-    free(ctr->column_info);
+    myfree(forests_info->totnhalos_per_forest);
+    myfree(ctr->ntrees_per_forest);
+    myfree(ctr->start_treenum_per_forest);
+    myfree(ctr->tree_offsets);
+    myfree(ctr->tree_fd);
+    myfree(ctr->column_info);
     for(int64_t i=0;i<ctr->numfiles;i++) {
         close(ctr->open_fds[i]);
     }
-    free(ctr->open_fds);
+    myfree(ctr->open_fds);
 }
 
 

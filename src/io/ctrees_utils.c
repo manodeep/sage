@@ -39,8 +39,8 @@ int64_t read_forests(const char *filename, int64_t **f, int64_t **t)
     }
     ntrees = getnumlines(filename, comment);
 
-    *f = calloc(ntrees, sizeof(int64_t));
-    *t = calloc(ntrees, sizeof(int64_t));
+    *f = malloc(ntrees * sizeof(int64_t));
+    *t = malloc(ntrees * sizeof(int64_t));
     
     int64_t *forests    = *f;
     int64_t *tree_roots = *t;
@@ -89,7 +89,7 @@ int64_t read_locations(const char *filename, const int64_t ntrees, struct locati
     
     struct filenames_and_fd *files_fd = filenames_and_fd;
     uint32_t numfiles_allocated = 2000;
-    files_fd->fd = calloc(numfiles_allocated, sizeof(files_fd->fd[0]));
+    files_fd->fd = malloc(numfiles_allocated * sizeof(files_fd->fd[0]));
     XASSERT( files_fd->fd != NULL, MALLOC_FAILURE, "Error: Could not allocate memory of %zu bytes to hold %"PRIu32" file descriptors",
              numfiles_allocated*sizeof(files_fd->fd[0]), numfiles_allocated);
     files_fd->nallocated = numfiles_allocated;
@@ -458,21 +458,21 @@ int fix_upid(const int64_t totnhalos, struct halo_data *forest, struct additiona
 void assign_mergertree_indices(const int64_t totnhalos, struct halo_data *forest, struct additional_info *info, const int max_snapnum)
 {
     const int nsnapshots = max_snapnum + 1;
-    double *scales = calloc(nsnapshots, sizeof(*scales));
+    double *scales = malloc(nsnapshots * sizeof(*scales));
     XASSERT(scales != NULL, MALLOC_FAILURE,
             "Error: Could not allocate memory to store the scale-factors for each snapshot (nsnapshots = %d)\n", nsnapshots);
     for(int i=0;i<nsnapshots;i++) {
         scales[i] = DBL_MAX;
     }
-    int64_t *start_scale = calloc((nsnapshots), sizeof(*start_scale));
+    int64_t *start_scale = malloc(nsnapshots * sizeof(*start_scale));
     XASSERT(start_scale != NULL, MALLOC_FAILURE,
             "Error: Could not allocate memory to store the starting scale-factors for each snapshot (nsnapshots = %d)\n", nsnapshots);
+    int64_t *end_scale = malloc(nsnapshots * sizeof(*end_scale));
+    XASSERT(end_scale != NULL, MALLOC_FAILURE,
+            "Error: Could not allocate memory to store the ending scale-factors for each snapshot (nsnapshots = %d)\n", nsnapshots);
     for(int i=0;i<nsnapshots;i++) {
         start_scale[i] = -1;
     }
-    int64_t *end_scale = calloc(nsnapshots, sizeof(*end_scale));
-    XASSERT(end_scale != NULL, MALLOC_FAILURE,
-            "Error: Could not allocate memory to store the ending scale-factors for each snapshot (nsnapshots = %d)\n", nsnapshots);
     
     /* Sort the trees based on scale, upid, and pid */
     /* Descending sort on scale, and then ascending sort on upid.

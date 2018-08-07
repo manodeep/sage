@@ -23,7 +23,7 @@ int reorder_lhalo_to_lhvt(const int32_t nhalos, struct halo_data *forest, int32_
 
 
     /* Sort LHalotree into snapshot, FOF group, */
-    int32_t *index = calloc(nhalos, sizeof(*index));
+    int32_t *index = malloc(nhalos * sizeof(*index));
     if(index == NULL) {
         perror(NULL);
         fprintf(stderr,"Error: Could not allocate memory for the index array for a forest with nhalos = %d. "
@@ -214,7 +214,7 @@ int fix_mergertree_index(struct halo_data *forest, const int64_t nhalos, const i
         return INTEGER_32BIT_TOO_SMALL;
     }
 
-    int32_t *current_index_for_old_order = calloc(nhalos, sizeof(*current_index_for_old_order));
+    int32_t *current_index_for_old_order = malloc(nhalos * sizeof(*current_index_for_old_order));
     if(current_index_for_old_order == NULL) {
         return MALLOC_FAILURE;
     }
@@ -230,7 +230,7 @@ int fix_mergertree_index(struct halo_data *forest, const int64_t nhalos, const i
        while the key, on the LHS, is the *OLD* index. Thus, current_index_for_old_order is an array that tells
        us where *ANY* halo index from the *OLD* order can be found in the *NEW* order.
        
-       Looks deceptively simple, it isn't. Took 3-days of my time + 2 hours of YQ's to nail this down and have
+       Looks deceptively simple, it isn't. Took 3-days of my time + 2 hours of YQin's to nail this down and have
        validations pass. - MS 19/11/2016
        
     */
