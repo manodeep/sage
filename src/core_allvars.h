@@ -335,6 +335,8 @@ struct params
     double ZZ[ABSOLUTEMAXSNAPS];
     double AA[ABSOLUTEMAXSNAPS];
     double *Age;
+
+    int interrupted;/* to re-print the progress-bar */
 };
 extern struct params run_params;
 

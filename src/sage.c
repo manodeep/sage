@@ -122,20 +122,20 @@ static void sage_per_file(const int ThisTask, const int filenr, struct forest_in
     /* open all the output files corresponding to this tree file (specified by filenr) */
     initialize_galaxy_files(filenr, Nforests, save_fd);
     
-    int interrupted=0;
+    run_params.interrupted = 0;
     if(ThisTask == 0) {
-        init_my_progressbar(stderr, Nforests, &interrupted);
+        init_my_progressbar(stderr, Nforests, &(run_params.interrupted));
     }
     
     
     for(int forestnr = 0; forestnr < Nforests; forestnr++) {
         if(ThisTask == 0) {
-            my_progressbar(stderr, forestnr, &interrupted);
+            my_progressbar(stderr, forestnr, &(run_params.interrupted));
         }
         const int nhalos = forests_info->totnhalos_per_forest[forestnr];
         
         /* the millennium tree is really a collection of trees, viz., a forest */
-        sage_per_forest(filenr, forestnr, nhalos, TotGalaxies, ForestNgals, save_fd, &interrupted, forests_info);
+        sage_per_forest(filenr, forestnr, nhalos, TotGalaxies, ForestNgals, save_fd, &(run_params.interrupted), forests_info);
     }
 
     finalize_galaxy_file(Nforests, (const int *) TotGalaxies, (const int **) ForestNgals, save_fd);
@@ -147,7 +147,7 @@ static void sage_per_file(const int ThisTask, const int filenr, struct forest_in
 
 
     if(ThisTask == 0) {
-        finish_myprogressbar(stderr, &interrupted);
+        finish_myprogressbar(stderr, &(run_params.interrupted));
         fprintf(stdout, "\ndone file %d\n\n", filenr);
     }
 }

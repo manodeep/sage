@@ -38,6 +38,7 @@ void *mymalloc(size_t n)
         if(HighMarkMem > OldPrintedHighMark + 10 * 1024.0 * 1024.0) {
             printf("new high mark = %g MB\n", HighMarkMem / (1024.0 * 1024.0));
             OldPrintedHighMark = HighMarkMem;
+            run_params.interrupted = 1;
         }
     }
 
@@ -67,6 +68,7 @@ void *mycalloc(const size_t count, const size_t size)
         if(HighMarkMem > OldPrintedHighMark + 10 * 1024.0 * 1024.0) {
             printf("new high mark = %g MB\n", HighMarkMem / (1024.0 * 1024.0));
             OldPrintedHighMark = HighMarkMem;
+            run_params.interrupted = 1;
         }
     }
 
@@ -139,6 +141,7 @@ void *myrealloc(void *p, size_t n)
         if(HighMarkMem > OldPrintedHighMark + 10 * 1024.0 * 1024.0) {
             printf("new high mark = %g MB\n", HighMarkMem / (1024.0 * 1024.0));
             OldPrintedHighMark = HighMarkMem;
+            run_params.interrupted = 1;
         }
     }
 
@@ -191,5 +194,6 @@ void myfree(void *p)
 void print_allocated(void)
 {
     printf("allocated = %g MB\n", TotMem / (1024.0 * 1024.0));
+    run_params.interrupted = 1;
 }
 
