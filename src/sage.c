@@ -185,11 +185,14 @@ static void sage_per_forest(const int filenr, const int forestnr, int nhalos, in
     int maxgals = (int)(MAXGALFAC * nhalos);
     if(maxgals < 10000) maxgals = 10000;
 
-    HaloAux = mycalloc(nhalos, sizeof(HaloAux[0]));
-    HaloGal = mycalloc(maxgals, sizeof(HaloGal[0]));
-    Gal = mycalloc(maxgals, sizeof(Gal[0]));/* used to be fof_maxgals instead of maxgals*/
+    HaloAux = mymalloc(nhalos * sizeof(HaloAux[0]));
+    HaloGal = mymalloc(maxgals * sizeof(HaloGal[0]));
+    Gal = mymalloc(maxgals * sizeof(Gal[0]));/* used to be fof_maxgals instead of maxgals*/
 
     for(int i = 0; i < nhalos; i++) {
+        HaloAux[i].HaloFlag = 0;
+        HaloAux[i].NGalaxies = 0;
+        HaloAux[i].DoneFlag = 0;
         HaloAux[i].orig_index = file_ordering_of_halos[i];
     }
     free(file_ordering_of_halos);
@@ -208,7 +211,6 @@ static void sage_per_forest(const int filenr, const int forestnr, int nhalos, in
     
     int numgals = 0;
     int galaxycounter = 0;
-    
 
 #ifdef PROCESS_LHVT_STYLE
     /* this will be the new processing style --> one snapshot at a time */

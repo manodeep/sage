@@ -182,7 +182,7 @@ $(LIBOBJS): $(LIBSRC) $(LIBINCL)
 $(SAGELIB): $(LIBOBJS)
 	ar rcs $@ $(LIBOBJS) 
 
-.phony: clean celan celna clena
+.phony: clean celan celna clena tests
 celan celna clena: clean
 clean:
 	rm -f $(OBJS) $(EXEC) $(SAGELIB)
