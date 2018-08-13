@@ -18,13 +18,17 @@ matrix:
       env: COMPILER=gcc PYTHON_VERSION=2.7
       before_install:
         - wget http://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh
-
+        - brew update && brew install git-lfs
+        - git lfs install
+        
     - os: osx
       osx_image: xcode9.3
       compiler: clang
       env: COMPILER=clang FAMILY=clang V='Apple LLVM 7.0.0' PYTHON_VERSION=3.6
       before_install:
         - wget http://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh
+        - brew update && brew install git-lfs
+        - git lfs install
         
     - os: linux
       dist: trusty
@@ -54,6 +58,7 @@ before_script:
   - cd src/auxdata/trees/mini-millennium
   - wget https://data-portal.hpc.swin.edu.au/dataset/7bab038b-1d1f-4e79-8cfc-ea171dd1492f/resource/7ff28a50-c401-4a07-9041-13524cbac5c9/download/mini-millennium.tar
   - tar xvf mini-millennium.tar && cd ../../../../
+  - git lfs pull
 
 script:
   - make -r CC=$COMPILER
