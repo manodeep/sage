@@ -29,7 +29,7 @@
 #include <stdarg.h>
 #include <ctype.h>
 
-/* for pread/pwrite */
+/* for read/write/pread/pwrite */
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -171,6 +171,34 @@ size_t myfwrite(const void *ptr, const size_t size, const size_t nmemb, FILE * s
     return fwrite(ptr, size, nmemb, stream);
 }
 
+int myfseek(FILE * stream, const long offset, const int whence)
+{
+    return fseeko(stream, offset, whence);
+}
+  
+ssize_t mywrite(int fd, const void *ptr, size_t nbytes)
+{
+    size_t nbytes_left = nbytes;
+    ssize_t tot_nbytes_written = 0;
+    while(nbytes_left > 0) {
+        char *buf = (char *) ptr;
+        ssize_t bytes_written = write(fd, buf, nbytes);
+        if(bytes_written > 0 ) {
+            nbytes_left -= bytes_written;
+            buf += bytes_written;
+            tot_nbytes_written += bytes_written;
+        } else {
+            fprintf(stderr,"Error whiling writing to file\n");
+            perror(NULL);
+            ABORT(FILE_WRITE_ERROR);
+        }
+    }
+
+    return tot_nbytes_written;
+}
+
+
+
 ssize_t mypread(int fd, void *ptr, const size_t nbytes, off_t offset)
 {
     size_t nbytes_left = nbytes;
@@ -212,11 +240,5 @@ ssize_t mypwrite(int fd, const void *ptr, const size_t nbytes, off_t offset)
 
     return tot_nbytes_written;
 }
-
-int myfseek(FILE * stream, const long offset, const int whence)
-{
-    return fseek(stream, offset, whence);
-}
-    
 
 

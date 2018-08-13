@@ -15,8 +15,18 @@ struct METADATA_NAMES
   char name_TreeNHalos[MAX_STRING_LEN];
 }; 
 
+
+enum hdf5_dtype
+{
+    H5_INT32 = 0,
+    H5_INT64,
+    H5_REAL32,
+    H5_REAL64,
+}
+
+
 /* Local Proto-Types */
-static int32_t fill_genesis_metadata_names(struct METADATA_NAMES *metadata_names, enum Valid_TreeTypes my_TreeType);
+/* static int32_t fill_genesis_metadata_names(struct METADATA_NAMES *metadata_names, enum Valid_TreeTypes my_TreeType); */
 static int32_t read_attribute_int(hid_t my_hdf5_file, char *groupname, char *attr_name, int *attribute);
 static int32_t read_dataset(char *dataset_name, int32_t datatype, void *buffer, struct forest_info *forests_info);
 
@@ -31,41 +41,51 @@ void load_forest_table_genesis_hdf5(struct forest_info *forests_info)
     forests_info->hdf5_fp = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
 
     if (forests_info->hdf5_fp < 0) {
-        printf("can't open file `%s'\n", filename);
-        ABORT(0);    
+        fprintf(stderr,"can't open file `%s'\n", filename);
+        ABORT(FILE_NOT_FOUND);
     }
 
-    status = fill_genesis_metadata_names(&metadata_names, run_params.TreeType);
-    if (status != EXIT_SUCCESS) {
-        ABORT(0);
-    }
+    /* status = fill_genesis_metadata_names(&metadata_names, run_params.TreeType); */
+    /* if (status != EXIT_SUCCESS) { */
+    /*     ABORT(status); */
+    /* } */
  
-    status = read_attribute_int(forests_info->hdf5_fp, "/Header", metadata_names.name_NTrees, &(forests_info->nforests));
+    //read attribute -> hf['Header']['Particle_mass'].attrs['DarkMatter']
+    //read attribute -> hf['Header'].attrs['NSnaps']
+
+    status = read_attribute_int(forests_info->hdf5_fp, "/Header", "NSnaps", &(forests_info->nsnapshots));
     if (status != EXIT_SUCCESS) {
         fprintf(stderr, "Error while processing file %s\n", filename);
         fprintf(stderr, "Error code is %d\n", status);
-        ABORT(0);
+        perror(NULL);
+        ABORT(FILE_READ_ERROR);
     }
-    const int nforests = forests_info->nforests;
+
+
+    /* const int nforests = forests_info->nforests; */
     
-    status = read_attribute_int(forests_info->hdf5_fp, "/Header", metadata_names.name_totNHalos, &totNHalos);
-    if (status != EXIT_SUCCESS) { 
-        fprintf(stderr, "Error while processing file %s\n", filename);
-        fprintf(stderr, "Error code is %d\n", status);
-        ABORT(0);
-    }
+    /* status = read_attribute_int(forests_info->hdf5_fp, "/Header", metadata_names.name_totNHalos, &totNHalos); */
+    /* if (status != EXIT_SUCCESS) {  */
+    /*     fprintf(stderr, "Error while processing file %s\n", filename); */
+    /*     fprintf(stderr, "Error code is %d\n", status); */
+    /*     ABORT(0); */
+    /* } */
 
   
-    forests_info->totnhalos_per_forest = mymalloc(sizeof(int) * nforests); 
-    int *forestnhalos = forests_info->totnhalos_per_forest;
+    /* forests_info->totnhalos_per_forest = mymalloc(sizeof(int) * nforests);  */
+    /* int *forestnhalos = forests_info->totnhalos_per_forest; */
     
-    status = read_attribute_int(forests_info->hdf5_fp, "/Header", metadata_names.name_TreeNHalos, forestnhalos);
-    if (status != EXIT_SUCCESS) {
-        fprintf(stderr, "Error while processing file %s\n", filename);
-        fprintf(stderr, "Error code is %d\n", status);
-        ABORT(0);
-    }
+    /* status = read_attribute_int(forests_info->hdf5_fp, "/Header", metadata_names.name_TreeNHalos, forestnhalos); */
+    /* if (status != EXIT_SUCCESS) { */
+    /*     fprintf(stderr, "Error while processing file %s\n", filename); */
+    /*     fprintf(stderr, "Error code is %d\n", status); */
+    /*     ABORT(0); */
+    /* } */
+    
+    
 
+
+    
 }
 
 #define READ_GENESIS_TREE_PROPERTY(nsnaps, sage_name, hdf5_name, type_int, data_type) \
@@ -132,8 +152,6 @@ void load_forest_table_genesis_hdf5(struct forest_info *forests_info)
   ID: The halo ID
   Num_progen: number of progenitors
   
-
-  
   There are also additional fields that are present for Meraxes,
   
   ForestID: A unique id that groups all descendants of a field halo and any subhalos it may have contained (which can link halos together if one was initially a subhalo of the other).This is computationally intensive. Allows for quick parsing of all halos to identify those that interact across cosmic time.
@@ -185,29 +203,29 @@ void load_forest_genesis_hdf5(int32_t forestnr, const int32_t nhalos, struct hal
     // To do so, we read the field into a buffer and then properly slot the field into the Halo struct.
 
     /* Merger Tree Pointers */ 
-    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, Descendant, Descendant, 0, int);
-    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, FirstProgenitor, FirstProgenitor, 0, int);
-    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, NextProgenitor, NextProgenitor, 0, int);
-    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, FirstHaloInFOFgroup, FirstHaloInFOFgroup, 0, int);
-    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, NextHaloInFOFgroup, NextHaloInFOFgroup, 0, int);
+    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, Descendant, Descendant, H5_INT32, int);
+    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, FirstProgenitor, FirstProgenitor, H5_INT32, int);
+    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, NextProgenitor, NextProgenitor, H5_INT32, int);
+    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, FirstHaloInFOFgroup, FirstHaloInFOFgroup, H5_INT32, int);
+    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, NextHaloInFOFgroup, NextHaloInFOFgroup, H5_INT32, int);
 
     /* Halo Properties */ 
-    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, Len, Len, 0, int);
-    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, M_Mean200, M_mean200, 1, float);
-    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, Mvir, Mvir, 1, float);
-    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, M_TopHat, M_TopHat, 1, float);
-    READ_GENESIS_TREE_PROPERTY_MULTIPLEDIM(MaxSnapshot, Pos, Pos, 1, float);
-    READ_GENESIS_TREE_PROPERTY_MULTIPLEDIM(MaxSnapshot, Vel, Vel, 1, float);
-    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, VelDisp, VelDisp, 1, float);
-    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, Vmax, Vmax, 1, float);
-    READ_GENESIS_TREE_PROPERTY_MULTIPLEDIM(MaxSnapshot, Spin, Spin, 1, float);
-    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, MostBoundID, MostBoundID, 2, long long);
+    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, Len, Len, H5_INT32, int);
+    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, M_Mean200, M_mean200, H5_REAL32, FLOAT);
+    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, Mvir, Mvir, H5_REAL32, float);
+    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, M_TopHat, M_TopHat, H5_REAL32, float);
+    READ_GENESIS_TREE_PROPERTY_MULTIPLEDIM(MaxSnapshot, Pos, Pos, H5_REAL32, float);
+    READ_GENESIS_TREE_PROPERTY_MULTIPLEDIM(MaxSnapshot, Vel, Vel, H5_REAL32, float);
+    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, VelDisp, VelDisp, H5_REAL32, float);
+    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, Vmax, Vmax, H5_REAL32, float);
+    READ_GENESIS_TREE_PROPERTY_MULTIPLEDIM(MaxSnapshot, Spin, Spin, H5_REAL32, float);
+    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, MostBoundID, MostBoundID, H5_INT64, long long);
 
     /* File Position Info */
-    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, SnapNum, SnapNum, 0, int);
-    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, FileNr, Filenr, 0, int);
-    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, SubhaloIndex, SubHaloIndex, 0, int);
-    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, SubHalfMass, SubHalfMass, 0, int);
+    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, SnapNum, SnapNum, H5_INT32, int);
+    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, FileNr, Filenr, H5_INT32, int);
+    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, SubhaloIndex, SubHaloIndex, H5_INT32, int);
+    READ_GENESIS_TREE_PROPERTY(MaxSnapshot, SubHalfMass, SubHalfMass, H5_INT32, int);
 
     free(buffer);
     free(buffer_multipledim);
@@ -232,34 +250,6 @@ void close_genesis_hdf5_file(struct forest_info *forests_info)
 }
 
 /* Local Functions */
-static int32_t fill_genesis_metadata_names(struct METADATA_NAMES *metadata_names, enum Valid_TreeTypes my_TreeType)
-{
-
-    switch (my_TreeType)
-        {
-
-        case genesis_lhalo_hdf5: 
-  
-            snprintf(metadata_names->name_NTrees, MAX_STRING_LEN - 1, "NTrees"); // Total number of forests within the file.
-            snprintf(metadata_names->name_totNHalos, MAX_STRING_LEN - 1, "totNHalos"); // Total number of halos within the file.
-            snprintf(metadata_names->name_TreeNHalos, MAX_STRING_LEN - 1, "TreeNHalos"); // Number of halos per forest within the file.
-            return EXIT_SUCCESS;
-
-        case lhalo_binary: 
-            fprintf(stderr, "If the file is binary then this function should never be called.  Something's gone wrong...");
-            return EXIT_FAILURE;
-
-        default:
-            fprintf(stderr, "Your tree type has not been included in the switch statement for ``%s`` in file ``%s``.\n", __FUNCTION__, __FILE__);
-            fprintf(stderr, "Please add it there.\n");
-            ABORT(EXIT_FAILURE);
-
-        }
-
-    return EXIT_FAILURE;
-
-}
-
 static int32_t read_attribute_int(hid_t my_hdf5_file, char *groupname, char *attr_name, int *attribute)
 {
 
@@ -302,14 +292,14 @@ static int32_t read_dataset(char *dataset_name, int32_t datatype, void *buffer, 
     switch (datatype)
         {
 
-        case 0:
+        case H5_INT32:
             H5Dread(dataset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, buffer);  
             break;
 
-        case 1:
+        case H5_REAL32:
             H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, buffer);
             break;
-        case 2:
+        case H5_INT64:
             H5Dread(dataset_id, H5T_NATIVE_LLONG, H5S_ALL, H5S_ALL, H5P_DEFAULT, buffer);            
             break;
             

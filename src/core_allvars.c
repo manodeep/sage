@@ -1,8 +1,5 @@
 #include "core_allvars.h"
 
-/*  Parameters */
-struct params run_params;
-
 #if 0
 /*
   MS: Are these only required for hdf5 output? Why

@@ -21,8 +21,18 @@
 #include "model_starformation_and_feedback.h"
 #include "model_cooling_heating.h"
 
+
+static void evolve_galaxies(const int halonr, const int ngal, int *numgals, int *maxgals, struct halo_data *halos,
+                            struct halo_aux_data *haloaux, struct GALAXY **ptr_to_galaxies, struct GALAXY **ptr_to_halogal, struct params *run_params);
+static int join_galaxies_of_progenitors(const int halonr, const int ngalstart, int *galaxycounter, int *maxgals, struct halo_data *halos,
+                                        struct halo_aux_data *haloaux, struct GALAXY **ptr_to_galaxies, struct GALAXY **ptr_to_halogal, struct params *run_params);
+
+
+
+/* the only externally visible function */
 void construct_galaxies(const int halonr, int *numgals, int *galaxycounter, int *maxgals, struct halo_data *halos,
-                       struct halo_aux_data *haloaux, struct GALAXY **ptr_to_galaxies, struct GALAXY **ptr_to_halogal)
+                        struct halo_aux_data *haloaux, struct GALAXY **ptr_to_galaxies, struct GALAXY **ptr_to_halogal,
+                        struct params *run_params)
 {
   static int halosdone = 0;
   int prog, fofhalo;
@@ -33,7 +43,7 @@ void construct_galaxies(const int halonr, int *numgals, int *galaxycounter, int 
   prog = halos[halonr].FirstProgenitor;
   while(prog >= 0) {
       if(haloaux[prog].DoneFlag == 0) {
-          construct_galaxies(prog, numgals, galaxycounter, maxgals, halos, haloaux, ptr_to_galaxies, ptr_to_halogal);
+          construct_galaxies(prog, numgals, galaxycounter, maxgals, halos, haloaux, ptr_to_galaxies, ptr_to_halogal, run_params);
       }
       prog = halos[prog].NextProgenitor;
   }
@@ -45,7 +55,7 @@ void construct_galaxies(const int halonr, int *numgals, int *galaxycounter, int 
           prog = halos[fofhalo].FirstProgenitor;
           while(prog >= 0) {
               if(haloaux[prog].DoneFlag == 0) {
-                  construct_galaxies(prog, numgals, galaxycounter, maxgals, halos, haloaux, ptr_to_galaxies, ptr_to_halogal);                  
+                  construct_galaxies(prog, numgals, galaxycounter, maxgals, halos, haloaux, ptr_to_galaxies, ptr_to_halogal, run_params);
               }
               prog = halos[prog].NextProgenitor;
           }
@@ -65,11 +75,11 @@ void construct_galaxies(const int halonr, int *numgals, int *galaxycounter, int 
     haloaux[fofhalo].HaloFlag = 2;
 
     while(fofhalo >= 0) {
-        ngal = join_galaxies_of_progenitors(fofhalo, ngal, galaxycounter, maxgals, halos, haloaux, ptr_to_galaxies, ptr_to_halogal);
+        ngal = join_galaxies_of_progenitors(fofhalo, ngal, galaxycounter, maxgals, halos, haloaux, ptr_to_galaxies, ptr_to_halogal, run_params);
         fofhalo = halos[fofhalo].NextHaloInFOFgroup;
     }
 
-    evolve_galaxies(halos[halonr].FirstHaloInFOFgroup, ngal, numgals, maxgals, halos, haloaux, ptr_to_galaxies, ptr_to_halogal);
+    evolve_galaxies(halos[halonr].FirstHaloInFOFgroup, ngal, numgals, maxgals, halos, haloaux, ptr_to_galaxies, ptr_to_halogal, run_params);
   }
 
 }
@@ -77,7 +87,7 @@ void construct_galaxies(const int halonr, int *numgals, int *galaxycounter, int 
 
 
 int join_galaxies_of_progenitors(const int halonr, const int ngalstart, int *galaxycounter, int *maxgals, struct halo_data *halos,
-                                 struct halo_aux_data *haloaux, struct GALAXY **ptr_to_galaxies, struct GALAXY **ptr_to_halogal)
+                                 struct halo_aux_data *haloaux, struct GALAXY **ptr_to_galaxies, struct GALAXY **ptr_to_halogal, struct params *run_params)
 {
     int ngal, prog,  first_occupied, lenmax, lenoccmax;
     struct GALAXY *galaxies = *ptr_to_galaxies;
@@ -144,9 +154,9 @@ int join_galaxies_of_progenitors(const int halonr, const int ngalstart, int *gal
                 }
 
                 // remember properties from the last snapshot
-                const double previousMvir = galaxies[ngal].Mvir;
-                const double previousVvir = galaxies[ngal].Vvir;
-                const double previousVmax = galaxies[ngal].Vmax;
+                const float previousMvir = galaxies[ngal].Mvir;
+                const float previousVvir = galaxies[ngal].Vvir;
+                const float previousVmax = galaxies[ngal].Vmax;
               
                 if(prog == first_occupied) {
                     // update properties of this galaxy with physical properties of halo 
@@ -160,13 +170,13 @@ int join_galaxies_of_progenitors(const int halonr, const int ngalstart, int *gal
                     galaxies[ngal].Len = halos[halonr].Len;
                     galaxies[ngal].Vmax = halos[halonr].Vmax;
 
-                    galaxies[ngal].deltaMvir = get_virial_mass(halonr, halos) - galaxies[ngal].Mvir;
+                    galaxies[ngal].deltaMvir = get_virial_mass(halonr, halos, run_params) - galaxies[ngal].Mvir;
 
-                    if(get_virial_mass(halonr, halos) > galaxies[ngal].Mvir) {
-                        galaxies[ngal].Rvir = get_virial_radius(halonr, halos);  // use the maximum Rvir in model
-                        galaxies[ngal].Vvir = get_virial_velocity(halonr, halos);  // use the maximum Vvir in model
+                    if(get_virial_mass(halonr, halos, run_params) > galaxies[ngal].Mvir) {
+                        galaxies[ngal].Rvir = get_virial_radius(halonr, halos, run_params);  // use the maximum Rvir in model
+                        galaxies[ngal].Vvir = get_virial_velocity(halonr, halos, run_params);  // use the maximum Vvir in model
                     }
-                    galaxies[ngal].Mvir = get_virial_mass(halonr, halos);
+                    galaxies[ngal].Mvir = get_virial_mass(halonr, halos, run_params);
 
                     galaxies[ngal].Cooling = 0.0;
                     galaxies[ngal].Heating = 0.0;
@@ -183,7 +193,7 @@ int join_galaxies_of_progenitors(const int halonr, const int ngalstart, int *gal
                         // a central galaxy
                         galaxies[ngal].mergeType = 0;
                         galaxies[ngal].mergeIntoID = -1;
-                        galaxies[ngal].MergTime = 999.9;            
+                        galaxies[ngal].MergTime = 999.9f;            
 
                         galaxies[ngal].DiskScaleRadius = get_disk_radius(halonr, ngal, halos, galaxies);
             
@@ -199,9 +209,9 @@ int join_galaxies_of_progenitors(const int halonr, const int ngalstart, int *gal
                             galaxies[ngal].infallVmax = previousVmax;
                         }
 
-                        if(galaxies[ngal].Type == 0 || galaxies[ngal].MergTime > 999.0) {
+                        if(galaxies[ngal].Type == 0 || galaxies[ngal].MergTime > 999.0f) {
                             // here the galaxy has gone from type 1 to type 2 or otherwise doesn't have a merging time.
-                            galaxies[ngal].MergTime = estimate_merging_time(halonr, halos[halonr].FirstHaloInFOFgroup, ngal, halos, galaxies);
+                            galaxies[ngal].MergTime = estimate_merging_time(halonr, halos[halonr].FirstHaloInFOFgroup, ngal, halos, galaxies, run_params);
                         }
             
                         galaxies[ngal].Type = 1;
@@ -232,7 +242,7 @@ int join_galaxies_of_progenitors(const int halonr, const int ngalstart, int *gal
 
     if(ngal == 0) {
         // We have no progenitors with galaxies. This means we create a new galaxy.
-        init_galaxy(ngal, halonr, galaxycounter, halos, galaxies);
+        init_galaxy(ngal, halonr, galaxycounter, halos, galaxies, run_params);
         ngal++;
     }
 
@@ -259,7 +269,8 @@ int join_galaxies_of_progenitors(const int halonr, const int ngalstart, int *gal
 /* end of join_galaxies_of_progenitors */
 
 void evolve_galaxies(const int halonr, const int ngal, int *numgals, int *maxgals, struct halo_data *halos,
-                    struct halo_aux_data *haloaux, struct GALAXY **ptr_to_galaxies, struct GALAXY **ptr_to_halogal)
+                     struct halo_aux_data *haloaux, struct GALAXY **ptr_to_galaxies, struct GALAXY **ptr_to_halogal,
+                     struct params *run_params)
 {
     struct GALAXY *galaxies = *ptr_to_galaxies;
     struct GALAXY *halogal = *ptr_to_halogal;
@@ -272,9 +283,9 @@ void evolve_galaxies(const int halonr, const int ngal, int *numgals, int *maxgal
      */
 
     const int halo_snapnum = halos[halonr].SnapNum;
-    const double Zcurr = run_params.ZZ[halo_snapnum];
-    const double halo_age = run_params.Age[halo_snapnum];
-    const double infallingGas = infall_recipe(centralgal, ngal, Zcurr, galaxies);
+    const double Zcurr = run_params->ZZ[halo_snapnum];
+    const double halo_age = run_params->Age[halo_snapnum];
+    const double infallingGas = infall_recipe(centralgal, ngal, Zcurr, galaxies, run_params);
 
     // We integrate things forward by using a number of intervals equal to STEPS
     for(int step = 0; step < STEPS; step++) {
@@ -286,8 +297,8 @@ void evolve_galaxies(const int halonr, const int ngal, int *numgals, int *maxgal
                 continue;
             }
             
-            const double deltaT = run_params.Age[galaxies[p].SnapNum] - halo_age;
-            const double time = run_params.Age[galaxies[p].SnapNum] - (step + 0.5) * (deltaT / STEPS);
+            const double deltaT = run_params->Age[galaxies[p].SnapNum] - halo_age;
+            const double time = run_params->Age[galaxies[p].SnapNum] - (step + 0.5) * (deltaT / STEPS);
             
             if(galaxies[p].dT < 0.0) {
                 galaxies[p].dT = deltaT;
@@ -297,21 +308,21 @@ void evolve_galaxies(const int halonr, const int ngal, int *numgals, int *maxgal
             if(p == centralgal) {
                 add_infall_to_hot(centralgal, infallingGas / STEPS, galaxies);
 
-                if(run_params.ReIncorporationFactor > 0.0) {
-                    reincorporate_gas(centralgal, deltaT / STEPS, galaxies);
+                if(run_params->ReIncorporationFactor > 0.0) {
+                    reincorporate_gas(centralgal, deltaT / STEPS, galaxies, run_params);
                 }
             } else {
                 if(galaxies[p].Type == 1 && galaxies[p].HotGas > 0.0) {
-                    strip_from_satellite(centralgal, p, Zcurr, galaxies);
+                    strip_from_satellite(centralgal, p, Zcurr, galaxies, run_params);
                 }
             }
             
             // Determine the cooling gas given the halo properties
-            double coolingGas = cooling_recipe(p, deltaT / STEPS, galaxies);
+            double coolingGas = cooling_recipe(p, deltaT / STEPS, galaxies, run_params);
             cool_gas_onto_galaxy(p, coolingGas, galaxies);
             
             // stars form and then explode!
-            starformation_and_feedback(p, centralgal, time, deltaT / STEPS, halonr, step, galaxies);
+            starformation_and_feedback(p, centralgal, time, deltaT / STEPS, halonr, step, galaxies, run_params);
         }
         
         // check for satellite disruption and merger events
@@ -321,14 +332,14 @@ void evolve_galaxies(const int halonr, const int ngal, int *numgals, int *maxgal
             if((galaxies[p].Type == 1 || galaxies[p].Type == 2) && galaxies[p].mergeType == 0) {
                 assert(galaxies[p].MergTime < 999.0);
                 
-                const double deltaT = run_params.Age[galaxies[p].SnapNum] - halo_age;
+                const double deltaT = run_params->Age[galaxies[p].SnapNum] - halo_age;
                 galaxies[p].MergTime -= deltaT / STEPS;
                 
                 // only consider mergers or disruption for halo-to-baryonic mass ratios below the threshold
                 // or for satellites with no baryonic mass (they don't grow and will otherwise hang around forever)
                 double currentMvir = galaxies[p].Mvir - galaxies[p].deltaMvir * (1.0 - ((double)step + 1.0) / (double)STEPS);
                 double galaxyBaryons = galaxies[p].StellarMass + galaxies[p].ColdGas;
-                if((galaxyBaryons == 0.0) || (galaxyBaryons > 0.0 && (currentMvir / galaxyBaryons <= run_params.ThresholdSatDisruption))) {
+                if((galaxyBaryons == 0.0) || (galaxyBaryons > 0.0 && (currentMvir / galaxyBaryons <= run_params->ThresholdSatDisruption))) {
 
                     int merger_centralgal = galaxies[p].Type==1 ? centralgal:galaxies[p].CentralGal;
                     
@@ -344,8 +355,8 @@ void evolve_galaxies(const int halonr, const int ngal, int *numgals, int *maxgal
                     } else {
                         // a merger has occured!
                         if(galaxies[p].MergTime <= 0.0)  {
-                            double time = run_params.Age[galaxies[p].SnapNum] - (step + 0.5) * (deltaT / STEPS);
-                            deal_with_galaxy_merger(p, merger_centralgal, centralgal, time, deltaT / STEPS, halonr, step, galaxies);
+                            double time = run_params->Age[galaxies[p].SnapNum] - (step + 0.5) * (deltaT / STEPS);
+                            deal_with_galaxy_merger(p, merger_centralgal, centralgal, time, deltaT / STEPS, halonr, step, galaxies, run_params);
                         }
                     }
                 }
@@ -357,7 +368,7 @@ void evolve_galaxies(const int halonr, const int ngal, int *numgals, int *maxgal
 
     // Extra miscellaneous stuff before finishing this halo
     galaxies[centralgal].TotalSatelliteBaryons = 0.0;
-    const double deltaT = run_params.Age[galaxies[0].SnapNum] - halo_age;
+    const double deltaT = run_params->Age[galaxies[0].SnapNum] - halo_age;
     const double inv_deltaT = 1.0/deltaT;
     
     for(int p = 0; p < ngal; p++) {

@@ -10,9 +10,9 @@ extern "C" {
 
     
     /* Proto-Types */
-    extern int load_forest_table_ctrees(struct forest_info *forests_info);
-    extern int load_forest_ctrees(const int32_t forestnr, struct halo_data **halos, struct forest_info *forests_info);    
-    extern void close_ctrees_file(struct forest_info *forests_info);
+    extern void get_forests_filename_ctr_ascii(char *filename, const size_t len, const struct params *run_params);
+    extern int setup_forests_io_ctrees(struct forest_info *forests_info, const int ThisTask, const int NTasks, struct params *run_params);
+    extern int64_t load_forest_ctrees(const int32_t forestnr, struct halo_data **halos, struct forest_info *forests_info, struct params *run_params);
     extern void cleanup_forests_io_ctrees(struct forest_info *forests_info);
     
 #ifdef __cplusplus

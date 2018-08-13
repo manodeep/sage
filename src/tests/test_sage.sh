@@ -33,10 +33,10 @@ if [[ $? != 0 ]]; then
     exit 1
 fi
 
-
 # now cd into the output directory for this sage-run
 cd "$parent_path"/$datadir
 files=`ls model_z*`
+testdata_dir=combined_output
 if [[ $? == 0 ]]; then
     npassed=0
     nbitwise=0
@@ -44,12 +44,12 @@ if [[ $? == 0 ]]; then
     nfailed=0
     for f in $files; do
         ((nfiles++))
-        diff -q   $f  output/$f
+        diff -q   $f  $testdata_dir/$f
         if [[ $? == 0 ]]; then
             ((npassed++))
             ((nbitwise++))
         else
-            python "$parent_path"/sagediff.py $f output/$f         
+            python "$parent_path"/sagediff.py $f $testdata_dir/$f         
             if [[ $? == 0 ]]; then 
                 ((npassed++))
             else
@@ -64,6 +64,7 @@ else
     npassed=0
     # use the knowledge that there should have been 64
     # files for mini-millennium test case
+    # This will need to be changed once the files get combined -- MS: 10/08/2018
     nfiles=64
     nfailed=$nfiles
 fi

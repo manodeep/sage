@@ -29,7 +29,7 @@ extern "C" {
     extern int myfseek(FILE * stream, const long offset, const int whence);
     extern ssize_t mypread(int fd, void *ptr, const size_t nbytes, off_t offset);
     extern ssize_t mypwrite(int fd, const void *ptr, const size_t nbytes, off_t offset);
-    
+    extern ssize_t mywrite(int fd, const void *buf, size_t nbytes);
 #ifdef __cplusplus
 }
 #endif

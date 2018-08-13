@@ -249,8 +249,8 @@ def compare_catalogs(g1, g2):
         dtype = g1.dtype
         
         # set the error tolerance
-        rtol = 1e-7
-        atol = 1e-10
+        rtol = 1e-9
+        atol = 1e-13
         
         for fld in g1.dtype.names:
             if fld in ignored_fields:
@@ -261,7 +261,8 @@ def compare_catalogs(g1, g2):
 
             msg = "Field = `{0}` not the same between the two catalogs\n"\
                 .format(fld)
-            if np.allclose(f1, f2, rtol=rtol,  atol=atol): continue
+            # if np.allclose(f1, f2, rtol=rtol,  atol=atol): continue
+            if np.array_equal(f1, f2): continue
 
 
             # If control reaches here, then the arrays are not equal
@@ -295,14 +296,13 @@ if __name__ == '__main__':
     description = "Show differences between two SAGE catalogs"
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('file1', metavar='FILE',
-                        help='the first file (say, model1_z0.000.0)')
+                        help='the basename for the first set of files (say, model1_z0.000)')
     parser.add_argument('file2', metavar='FILE',
-                        help='the second file (say, model2_z0.000.0)')
+                        help='the basename for the second set of files (say, model2_z0.000)')
 
     args = parser.parse_args()
 
-    ignored_fields = ["SAGEHaloIndex", "GalaxyIndex",
-                      "CentralGalaxyIndex", "mergeIntoID"]
+    ignored_fields = ["GalaxyIndex", "CentralGalaxyIndex"]
     
     g1 = sageResults(args.file1, ignored_fields)
     g2 = sageResults(args.file2, ignored_fields)

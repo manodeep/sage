@@ -9,9 +9,10 @@ extern "C" {
     #include "core_allvars.h"
     
     /* core_io_tree.c */
-    extern void setup_forests_io(const enum Valid_TreeTypes my_TreeType, struct forest_info *forests_info);
-    extern void load_forest(const int forestnr, const int nhalos, enum Valid_TreeTypes my_TreeType, struct halo_data **halos, struct forest_info *forests_info);
-    extern void cleanup_forests_io_per_file(enum Valid_TreeTypes my_TreeType, struct forest_info *forests_info);
+    extern int open_forests_file(struct params *run_params, const int filenr);
+    int setup_forests_io(struct params *run_params, struct forest_info *forests_info,
+                         const int ThisTask, const int NTasks);
+    extern int64_t load_forest(struct params *run_params, const int forestnr, struct halo_data **halos, struct forest_info *forests_info);
     extern void cleanup_forests_io(enum Valid_TreeTypes my_TreeType, struct forest_info *forests_info);
     
 #ifdef __cplusplus

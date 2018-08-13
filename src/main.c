@@ -29,16 +29,31 @@ int main(int argc, char **argv)
     }
 
     /* initialize sage (read parameter file, setup units, read cooling tables etc) */
-    init_sage(ThisTask, argv[1]);
+    struct params run_params;
+    int status = EXIT_FAILURE;
+    status = init_sage(ThisTask, argv[1], &run_params);
+    if(status != EXIT_SUCCESS) {
+        goto err;
+    }
 
     /* run sage over all files */
-    run_sage(ThisTask, NTasks);
-    
+    status = run_sage(ThisTask, NTasks, &run_params);
+    if(status != EXIT_SUCCESS) {
+        goto err;
+    }
+
 #ifdef MPI
     MPI_Finalize();
 #endif
-    
     return EXIT_SUCCESS;
+
+ err:    
+#ifdef MPI        
+    MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    MPI_Finalize();
+#endif
+    return status;
+       
 }
 
 

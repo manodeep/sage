@@ -3,3 +3,5 @@ src/auxdata/trees/*
 *.o
 *.*~
 libsage.a
+*.ipynb_checkpoints
+*.dSYM

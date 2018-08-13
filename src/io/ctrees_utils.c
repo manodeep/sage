@@ -112,8 +112,8 @@ int64_t read_locations(const char *filename, const int64_t ntrees, struct locati
             XASSERT(ntrees_found < ntrees, EXIT_FAILURE,
                     "ntrees=%"PRId64" should be less than ntrees_found=%"PRId64"\n",
                     ntrees, ntrees_found);            
-            int nitems = sscanf(buffer, "%"SCNd64" %"SCNd64 " %"SCNd64 "%s", &locations->treeid,
-                                &locations->fileid, &locations->offset, linebuf);
+            int nitems = sscanf(buffer, "%"SCNd64" %d %"SCNd64 "%s",
+                                &locations->treeid, &locations->fileid, &locations->offset, linebuf);
 
             XASSERT(locations->offset >= 0, INVALID_VALUE_READ_FROM_FILE, 
                     "offset=%"PRId64" for ntree =%"PRId64" must be positive.\nFile = `%s'\nbuffer = `%s'\n",
@@ -553,15 +553,11 @@ void assign_mergertree_indices(const int64_t totnhalos, struct halo_data *forest
             }
             int64_t insertion_point = FirstHaloInFOFgroup;
             while(forest[insertion_point].NextHaloInFOFgroup != -1) {
-                const int64_t nexthalo = forest[insertion_point].NextHaloInFOFgroup;
+                const int32_t nexthalo = forest[insertion_point].NextHaloInFOFgroup;
                 XASSERT(nexthalo >=0 && nexthalo < totnhalos, EXIT_FAILURE, 
-                        "Inserting next halo in FOF group into invalid index. nexthalo = %"PRId64" totnhalos = %"PRId64"\n",
+                        "Inserting next halo in FOF group into invalid index. nexthalo = %d totnhalos = %"PRId64"\n",
                         nexthalo, totnhalos);
 
-                /* if(forest[nexthalo].Mvir < forest[i].Mvir) { */
-                /*     forest[i].NextHaloInFOFgroup = nexthalo; */
-                /*     break; */
-                /* } */
                 insertion_point = nexthalo;
             }
             XASSERT(i < INT_MAX, EXIT_FAILURE, 
@@ -572,8 +568,7 @@ void assign_mergertree_indices(const int64_t totnhalos, struct halo_data *forest
         }
     }
 
-    /* Now figure out merger tree pointers. Need to set descendant, firstprogenitor and nextprogenitor.
-     */
+    /* Now figure out merger tree pointers. Need to set descendant, firstprogenitor and nextprogenitor. */
     for(int64_t i=0;i<totnhalos;i++) {
         if(info[i].descid == -1) {
             forest[i].Descendant = -1;

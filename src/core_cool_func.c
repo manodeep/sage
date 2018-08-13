@@ -80,8 +80,6 @@ void read_cooling_functions(void)
 
 double get_rate(int tab, double logTemp)
 {
-    int index;
-    double rate1, rate2, rate, logTindex;
     const double dlogT = 0.05;
     const double inv_dlogT = 1.0/dlogT;
 
@@ -89,18 +87,18 @@ double get_rate(int tab, double logTemp)
         logTemp = 4.0;
     }
 
-    index = (logTemp - 4.0) * inv_dlogT;
+    int index = (int) ((logTemp - 4.0) * inv_dlogT);
     if(index >= LAST_TAB_INDEX) {
         /*MS: because index+1 is also accessed, therefore index can be at most LAST_TAB_INDEX */
         index = LAST_TAB_INDEX - 1;
     }
 
-    logTindex = 4.0 + 0.05 * index;
+    const double logTindex = 4.0 + 0.05 * index;
 
-    rate1 = CoolRate[tab][index];
-    rate2 = CoolRate[tab][index + 1];
+    const double rate1 = CoolRate[tab][index];
+    const double rate2 = CoolRate[tab][index + 1];
 
-    rate = rate1 + (rate2 - rate1) * inv_dlogT * (logTemp - logTindex);
+    const double rate = rate1 + (rate2 - rate1) * inv_dlogT * (logTemp - logTindex);
 
     return rate;
 }

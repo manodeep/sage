@@ -6,13 +6,9 @@
 extern "C" {
 #endif
 
-#if 0    
-/* To prevent text editors from being confused about the open brace*/
-}
-#endif
-
-extern void init_sage(const int ThisTask, const char *param_file);
-extern void run_sage(const int ThisTask, const int NTasks);
+    /* API for sage */
+    extern int init_sage(const int ThisTask, const char *param_file, struct params *run_params);
+    extern int run_sage(const int ThisTask, const int NTasks, struct params *run_params);
 
 #ifdef __cplusplus
 }

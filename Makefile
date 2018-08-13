@@ -3,14 +3,14 @@
 
 ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 LIBS :=
-OPTS := -DROOT_DIR='"${ROOT_DIR}"' -DUSE_FWRITE
-CCFLAGS := -DGNU_SOURCE -std=gnu99 -fPIC
+OPTS := -DROOT_DIR='"${ROOT_DIR}"'
+CCFLAGS := -DGNU_SOURCE -std=gnu99 -fPIC 
 SRC_PREFIX := src
 
 LIBNAME := sage
 LIBSRC :=  sage.c core_read_parameter_file.c core_init.c core_io_tree.c \
            core_cool_func.c core_build_model.c core_save.c core_mymalloc.c core_utils.c progressbar.c \
-           core_allvars.c core_tree_utils.c model_infall.c model_cooling_heating.c model_starformation_and_feedback.c \
+           core_tree_utils.c model_infall.c model_cooling_heating.c model_starformation_and_feedback.c \
            model_disk_instability.c model_reincorporation.c model_mergers.c model_misc.c \
            io/read_tree_binary.c io/read_tree_consistentrees_ascii.c io/ctrees_utils.c 
 LIBINCL := $(LIBSRC:.c=.h)
@@ -157,6 +157,11 @@ ifeq ($(DO_CHECKS), 1)
   CCFLAGS += $(GSL_INCL)
   LIBS += $(GSL_LIBS)
 
+  ifdef USE-MPI
+    MPI_LINK_FLAGS:=$(firstword $(shell mpicc --showme:link 2>/dev/null))
+    MPI_LIB_DIR:=$(firstword $(subst -L, , $(MPI_LINK_FLAGS)))
+    LIBS += -Xlinker -rpath -Xlinker $(MPI_LIB_DIR)
+  endif
   # The tests should test with the same compile flags
   # that users are expected to use. Disabled the previous
   # different optimization flags for travis vs regular users
@@ -171,13 +176,11 @@ endif # End of DO_CHECKS if condition -> i.e., we do need to care about paths an
 
 all:  $(EXEC) $(SAGELIB)
 
-$(EXEC): $(OBJS)
+$(EXEC): $(OBJS) $(SAGELIB)
 	$(CC) $(CCFLAGS) $(OBJS) $(LIBS)   -o  $(EXEC)
 
 %.o: %.c $(INCL) Makefile
 	$(CC) $(OPTS) $(OPTIMIZE) $(CCFLAGS) -c $< -o $@
-
-$(LIBOBJS): $(LIBSRC) $(LIBINCL)
 
 $(SAGELIB): $(LIBOBJS)
 	ar rcs $@ $(LIBOBJS) 

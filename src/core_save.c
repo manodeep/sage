@@ -5,6 +5,8 @@
 #include <time.h>
 #include <assert.h>
 #include <limits.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "core_allvars.h"
 #include "core_save.h"
@@ -12,58 +14,60 @@
 #include "model_misc.h"
 
 #define TREE_MUL_FAC        (1000000000LL)
-#define FILENR_MUL_FAC      (1000000000000000LL)
+#define THISTASK_MUL_FAC      (1000000000000000LL)
 
-void initialize_galaxy_files(const int filenr, const int ntrees, FILE **save_fd)
+void initialize_galaxy_files(const int rank, const int ntrees, int *save_fd, const struct params *run_params)
 {
+    if(run_params->NOUT > ABSOLUTEMAXSNAPS) {
+        fprintf(stderr,"Error: Attempting to write snapshot = '%d' will exceed allocated memory space for '%d' snapshots\n",
+                run_params->NOUT, ABSOLUTEMAXSNAPS);
+        fprintf(stderr,"To fix this error, simply increase the value of `ABSOLUTEMAXSNAPS` and recompile\n");
+        ABORT(INVALID_OPTION_IN_PARAMS);
+    }
+
     char buffer[4*MAX_STRING_LEN + 1];
     /* Open all the output files */
-    for(int n = 0; n < run_params.NOUT; n++) {
+    for(int n = 0; n < run_params->NOUT; n++) {
+        snprintf(buffer, 4*MAX_STRING_LEN, "%s/%s_z%1.3f_%d", run_params->OutputDir, run_params->FileNameGalaxies,
+                 run_params->ZZ[run_params->ListOutputSnaps[n]], rank);
 
-        snprintf(buffer, 4*MAX_STRING_LEN, "%s/%s_z%1.3f_%d", run_params.OutputDir, run_params.FileNameGalaxies,
-                 run_params.ZZ[run_params.ListOutputSnaps[n]], filenr);
-        
-        save_fd[n] = fopen(buffer, "w");
-        if (save_fd[n] == NULL) {
+        /* the last argument sets permissions as "rw-r--r--" (read/write owner, read group, read other)*/
+        save_fd[n] = open(buffer,  O_CREAT|O_TRUNC|O_WRONLY, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+        if (save_fd[n] < 0) {
             fprintf(stderr, "Error: Can't open file `%s'\n", buffer);
-            ABORT(0);
+            ABORT(FILE_NOT_FOUND);
         }
         
         // write out placeholders for the header data.
-        int* tmp_buf = calloc(ntrees + 2, sizeof(int32_t));
-        if (tmp_buf == NULL) {
-            fprintf(stderr, "Error: Could not allocate memory for header information for file %d\n", n);
-            ABORT(MALLOC_FAILURE);
-        }
-        
-        int nwritten = fwrite( tmp_buf, sizeof(int), ntrees + 2, save_fd[n] );
-        if (nwritten != ntrees + 2) {
+        const off_t off = (ntrees + 2) * sizeof(int32_t);
+        const off_t status = lseek(save_fd[n], off, SEEK_SET);
+        if(status < 0) {
             fprintf(stderr, "Error: Failed to write out %d elements for header information for file %d. "
-                    "Only wrote %d elements.\n", ntrees + 2, n, nwritten);
+                    "Attempted to write %"PRId64" bytes\n", ntrees + 2, n, off);
+            perror(NULL);
+            ABORT(FILE_WRITE_ERROR);
         }
-        free( tmp_buf );
     }
-
 }
 
 
-void save_galaxies(const int filenr, const int tree, const int numgals, struct halo_data *halos,
-                   struct halo_aux_data *haloaux, struct GALAXY *halogal, int **treengals, int *totgalaxies, FILE **save_fd)
+void save_galaxies(const int ThisTask, const int tree, const int numgals, struct halo_data *halos,
+                   struct halo_aux_data *haloaux, struct GALAXY *halogal, int **treengals, int *totgalaxies,
+                   const int *save_fd, const struct params *run_params)
 {
-    int OutputGalCount[run_params.MAXSNAPS];
-    memset(OutputGalCount, 0, sizeof(int32_t)*run_params.MAXSNAPS);
-    
+    int OutputGalCount[run_params->MAXSNAPS];
+    // reset the output galaxy count and total number of output galaxies
+    int cumul_output_ngal[run_params->MAXSNAPS];
+    for(int i = 0; i < run_params->MAXSNAPS; i++) {
+        OutputGalCount[i] = 0;
+        cumul_output_ngal[i] = 0;
+    }
+
+    // track the order in which galaxies are written
     int *OutputGalOrder = calloc(numgals, sizeof(OutputGalOrder[0]));
     if(OutputGalOrder == NULL) {
         fprintf(stderr,"Error: Could not allocate memory for %d int elements in array `OutputGalOrder`\n", numgals);
         ABORT(MALLOC_FAILURE);
-    }
-
-    // reset the output galaxy count and order
-    int cumul_output_ngal[run_params.MAXSNAPS];
-    for(int i = 0; i < run_params.MAXSNAPS; i++) {
-        OutputGalCount[i] = 0;
-        cumul_output_ngal[i] = 0;
     }
 
     for(int i = 0; i < numgals; i++) {
@@ -72,9 +76,9 @@ void save_galaxies(const int filenr, const int tree, const int numgals, struct h
     }
   
     // first update mergeIntoID to point to the correct galaxy in the output
-    for(int n = 0; n < run_params.NOUT; n++) {
+    for(int n = 0; n < run_params->NOUT; n++) {
         for(int i = 0; i < numgals; i++) {
-            if(halogal[i].SnapNum == run_params.ListOutputSnaps[n]) {
+            if(halogal[i].SnapNum == run_params->ListOutputSnaps[n]) {
                 OutputGalOrder[i] = OutputGalCount[n];
                 OutputGalCount[n]++;
                 haloaux[i].output_snap_n = n;
@@ -83,9 +87,9 @@ void save_galaxies(const int filenr, const int tree, const int numgals, struct h
     }
 
     int num_output_gals = 0;
-    int num_gals_processed[run_params.MAXSNAPS];
-    memset(num_gals_processed, 0, sizeof(num_gals_processed[0])*run_params.MAXSNAPS);
-    for(int n = 0; n < run_params.NOUT; n++) {
+    int num_gals_processed[run_params->MAXSNAPS];
+    memset(num_gals_processed, 0, sizeof(num_gals_processed[0])*run_params->MAXSNAPS);
+    for(int n = 0; n < run_params->NOUT; n++) {
         cumul_output_ngal[n] = num_output_gals;
         num_output_gals += OutputGalCount[n];
     }
@@ -106,20 +110,23 @@ void save_galaxies(const int filenr, const int tree, const int numgals, struct h
         if(haloaux[i].output_snap_n < 0) continue;
         int n = haloaux[i].output_snap_n;
         struct GALAXY_OUTPUT *galaxy_output = all_outputgals + cumul_output_ngal[n] + num_gals_processed[n];
-        prepare_galaxy_for_output(filenr, tree, &halogal[i], galaxy_output, halos, haloaux, halogal);
+        prepare_galaxy_for_output(ThisTask, tree, &halogal[i], galaxy_output, halos, haloaux, halogal, run_params);
         num_gals_processed[n]++;
         totgalaxies[n]++;
         treengals[n][tree]++;	      
     }    
 
     /* now write galaxies */
-    for(int n=0;n<run_params.NOUT;n++) {
+    for(int n=0;n<run_params->NOUT;n++) {
         struct GALAXY_OUTPUT *galaxy_output = all_outputgals + cumul_output_ngal[n];
-        int nwritten = myfwrite(galaxy_output, sizeof(struct GALAXY_OUTPUT), OutputGalCount[n], save_fd[n]);
-        if (nwritten != OutputGalCount[n]) {
-            fprintf(stderr, "Error: Failed to write out the galaxy struct for galaxies within file %d. "
-                    " Meant to write %d elements but only wrote %d elements.\n", n, OutputGalCount[n], nwritten);
-        }
+        mywrite(save_fd[n], galaxy_output, sizeof(struct GALAXY_OUTPUT)*OutputGalCount[n]);
+        /* int nwritten = myfwrite(galaxy_output, sizeof(struct GALAXY_OUTPUT), OutputGalCount[n], save_fd[n]); */
+        /* if (nwritten != OutputGalCount[n]) { */
+        /*     fprintf(stderr, "Error: Failed to write out the galaxy struct for galaxies within file %d. " */
+        /*             " Meant to write %d elements but only wrote %d elements.\n", n, OutputGalCount[n], nwritten); */
+        /*     perror(NULL); */
+        /*     ABORT(FILE_WRITE_ERROR); */
+        /* } */
     }
 
     // don't forget to free the workspace.
@@ -129,36 +136,41 @@ void save_galaxies(const int filenr, const int tree, const int numgals, struct h
 
 
 
-void prepare_galaxy_for_output(int filenr, int tree, struct GALAXY *g, struct GALAXY_OUTPUT *o,
+void prepare_galaxy_for_output(int ThisTask, int tree, struct GALAXY *g, struct GALAXY_OUTPUT *o,
                                struct halo_data *halos,
-                               struct halo_aux_data *haloaux, struct GALAXY *halogal)
+                               struct halo_aux_data *haloaux, struct GALAXY *halogal,
+                               const struct params *run_params)
 {
     o->SnapNum = g->SnapNum;
-    assert(g->Type >= SHRT_MIN && g->Type <= SHRT_MAX && "Converting galaxy type while saving from integer to short will result in data corruption");
+    if(g->Type < SHRT_MIN || g->Type > SHRT_MAX) {
+        fprintf(stderr,"Error: Galaxy type = %d can not be represented in 2 bytes\n", g->Type);
+        fprintf(stderr,"Converting galaxy type while saving from integer to short will result in data corruption");
+        ABORT(EXIT_FAILURE);
+    }
     o->Type = g->Type;
 
     // assume that because there are so many files, the trees per file will be less than 100000
     // required for limits of long long
-    if(run_params.LastFile>=10000) {
+    if(run_params->LastFile>=10000) {
         assert( g->GalaxyNr < TREE_MUL_FAC ); // breaking tree size assumption
-        assert(tree < (FILENR_MUL_FAC/10)/TREE_MUL_FAC);
-        o->GalaxyIndex = g->GalaxyNr + TREE_MUL_FAC * tree + (FILENR_MUL_FAC/10) * filenr;
-        assert( (o->GalaxyIndex - g->GalaxyNr - TREE_MUL_FAC*tree)/(FILENR_MUL_FAC/10) == filenr );
-        assert( (o->GalaxyIndex - g->GalaxyNr -(FILENR_MUL_FAC/10)*filenr) / TREE_MUL_FAC == tree );
-        assert( o->GalaxyIndex - TREE_MUL_FAC*tree - (FILENR_MUL_FAC/10)*filenr == g->GalaxyNr );
-        o->CentralGalaxyIndex = halogal[haloaux[halos[g->HaloNr].FirstHaloInFOFgroup].FirstGalaxy].GalaxyNr + TREE_MUL_FAC * tree + (FILENR_MUL_FAC/10) * filenr;
+        assert(tree < (THISTASK_MUL_FAC/10)/TREE_MUL_FAC);
+        o->GalaxyIndex = g->GalaxyNr + TREE_MUL_FAC * tree + (THISTASK_MUL_FAC/10) * ThisTask;
+        assert( (o->GalaxyIndex - g->GalaxyNr - TREE_MUL_FAC*tree)/(THISTASK_MUL_FAC/10) == ThisTask );
+        assert( (o->GalaxyIndex - g->GalaxyNr -(THISTASK_MUL_FAC/10)*ThisTask) / TREE_MUL_FAC == tree );
+        assert( o->GalaxyIndex - TREE_MUL_FAC*tree - (THISTASK_MUL_FAC/10)*ThisTask == g->GalaxyNr );
+        o->CentralGalaxyIndex = halogal[haloaux[halos[g->HaloNr].FirstHaloInFOFgroup].FirstGalaxy].GalaxyNr + TREE_MUL_FAC * tree + (THISTASK_MUL_FAC/10) * ThisTask;
     } else {
         assert( g->GalaxyNr < TREE_MUL_FAC ); // breaking tree size assumption
-        assert(tree < FILENR_MUL_FAC/TREE_MUL_FAC);
-        o->GalaxyIndex = g->GalaxyNr + TREE_MUL_FAC * tree + FILENR_MUL_FAC * filenr;
-        assert( (o->GalaxyIndex - g->GalaxyNr - TREE_MUL_FAC*tree)/FILENR_MUL_FAC == filenr );
-        assert( (o->GalaxyIndex - g->GalaxyNr -FILENR_MUL_FAC*filenr) / TREE_MUL_FAC == tree );
-        assert( o->GalaxyIndex - TREE_MUL_FAC*tree - FILENR_MUL_FAC*filenr == g->GalaxyNr );
-        o->CentralGalaxyIndex = halogal[haloaux[halos[g->HaloNr].FirstHaloInFOFgroup].FirstGalaxy].GalaxyNr + TREE_MUL_FAC * tree + FILENR_MUL_FAC * filenr;
+        assert(tree < THISTASK_MUL_FAC/TREE_MUL_FAC);
+        o->GalaxyIndex = g->GalaxyNr + TREE_MUL_FAC * tree + THISTASK_MUL_FAC * ThisTask;
+        assert( (o->GalaxyIndex - g->GalaxyNr - TREE_MUL_FAC*tree)/THISTASK_MUL_FAC == ThisTask );
+        assert( (o->GalaxyIndex - g->GalaxyNr -THISTASK_MUL_FAC*ThisTask) / TREE_MUL_FAC == tree );
+        assert( o->GalaxyIndex - TREE_MUL_FAC*tree - THISTASK_MUL_FAC*ThisTask == g->GalaxyNr );
+        o->CentralGalaxyIndex = halogal[haloaux[halos[g->HaloNr].FirstHaloInFOFgroup].FirstGalaxy].GalaxyNr + TREE_MUL_FAC * tree + THISTASK_MUL_FAC * ThisTask;
     }
 
 #undef TREE_MUL_FAC
-#undef FILENR_MUL_FAC
+#undef THISTASK_MUL_FAC
 
     o->SAGEHaloIndex = g->HaloNr;/* if the original input halonr is required, then use haloaux[halonr].orig_index: MS 29/6/2018 */
     o->SAGETreeIndex = tree;
@@ -170,7 +182,7 @@ void prepare_galaxy_for_output(int filenr, int tree, struct GALAXY *g, struct GA
     o->mergeType = g->mergeType;
     o->mergeIntoID = g->mergeIntoID;
     o->mergeIntoSnapNum = g->mergeIntoSnapNum;
-    o->dT = g->dT * run_params.UnitTime_in_s / SEC_PER_MEGAYEAR;
+    o->dT = g->dT * run_params->UnitTime_in_s / SEC_PER_MEGAYEAR;
 
     for(int j = 0; j < 3; j++) {
         o->Pos[j] = g->Pos[j];
@@ -180,9 +192,9 @@ void prepare_galaxy_for_output(int filenr, int tree, struct GALAXY *g, struct GA
     
     o->Len = g->Len;
     o->Mvir = g->Mvir;
-    o->CentralMvir = get_virial_mass(halos[g->HaloNr].FirstHaloInFOFgroup, halos);
-    o->Rvir = get_virial_radius(g->HaloNr, halos);  // output the actual Rvir, not the maximum Rvir
-    o->Vvir = get_virial_velocity(g->HaloNr, halos);  // output the actual Vvir, not the maximum Vvir
+    o->CentralMvir = get_virial_mass(halos[g->HaloNr].FirstHaloInFOFgroup, halos, run_params);
+    o->Rvir = get_virial_radius(g->HaloNr, halos, run_params);  // output the actual Rvir, not the maximum Rvir
+    o->Vvir = get_virial_velocity(g->HaloNr, halos, run_params);  // output the actual Vvir, not the maximum Vvir
     o->Vmax = g->Vmax;
     o->VelDisp = halos[g->HaloNr].VelDisp;
 
@@ -208,8 +220,8 @@ void prepare_galaxy_for_output(int filenr, int tree, struct GALAXY *g, struct GA
   
     // NOTE: in Msun/yr
     for(int step = 0; step < STEPS; step++) {
-        o->SfrDisk += g->SfrDisk[step] * run_params.UnitMass_in_g / run_params.UnitTime_in_s * SEC_PER_YEAR / SOLAR_MASS / STEPS;
-        o->SfrBulge += g->SfrBulge[step] * run_params.UnitMass_in_g / run_params.UnitTime_in_s * SEC_PER_YEAR / SOLAR_MASS / STEPS;
+        o->SfrDisk += g->SfrDisk[step] * run_params->UnitMass_in_g / run_params->UnitTime_in_s * SEC_PER_YEAR / SOLAR_MASS / STEPS;
+        o->SfrBulge += g->SfrBulge[step] * run_params->UnitMass_in_g / run_params->UnitTime_in_s * SEC_PER_YEAR / SOLAR_MASS / STEPS;
         
         if(g->SfrDiskColdGas[step] > 0.0) {
             o->SfrDiskZ += g->SfrDiskColdGasMetals[step] / g->SfrDiskColdGas[step] / STEPS;
@@ -223,23 +235,23 @@ void prepare_galaxy_for_output(int filenr, int tree, struct GALAXY *g, struct GA
     o->DiskScaleRadius = g->DiskScaleRadius;
 
     if (g->Cooling > 0.0) {
-        o->Cooling = log10(g->Cooling * run_params.UnitEnergy_in_cgs / run_params.UnitTime_in_s);
+        o->Cooling = log10(g->Cooling * run_params->UnitEnergy_in_cgs / run_params->UnitTime_in_s);
     } else {
         o->Cooling = 0.0;
     }
 
     if (g->Heating > 0.0) {
-        o->Heating = log10(g->Heating * run_params.UnitEnergy_in_cgs / run_params.UnitTime_in_s);
+        o->Heating = log10(g->Heating * run_params->UnitEnergy_in_cgs / run_params->UnitTime_in_s);
     } else {
         o->Heating = 0.0;
     }
 
     o->QuasarModeBHaccretionMass = g->QuasarModeBHaccretionMass;
 
-    o->TimeOfLastMajorMerger = g->TimeOfLastMajorMerger * run_params.UnitTime_in_Megayears;
-    o->TimeOfLastMinorMerger = g->TimeOfLastMinorMerger * run_params.UnitTime_in_Megayears;
+    o->TimeOfLastMajorMerger = g->TimeOfLastMajorMerger * run_params->UnitTime_in_Megayears;
+    o->TimeOfLastMinorMerger = g->TimeOfLastMinorMerger * run_params->UnitTime_in_Megayears;
 	
-    o->OutflowRate = g->OutflowRate * run_params.UnitMass_in_g / run_params.UnitTime_in_s * SEC_PER_YEAR / SOLAR_MASS;
+    o->OutflowRate = g->OutflowRate * run_params->UnitMass_in_g / run_params->UnitTime_in_s * SEC_PER_YEAR / SOLAR_MASS;
 
     //infall properties
     if(g->Type != 0) {
@@ -254,37 +266,46 @@ void prepare_galaxy_for_output(int filenr, int tree, struct GALAXY *g, struct GA
 }
 
 
-void finalize_galaxy_file(const int ntrees, const int *totgalaxies, const int **treengals, FILE **save_fd)    
+int finalize_galaxy_file(const int ntrees, const int *totgalaxies, const int **treengals, int *save_fd, const struct params *run_params) 
 {
-    for(int n = 0; n < run_params.NOUT; n++) {
+    if(run_params->NOUT > ABSOLUTEMAXSNAPS) {
+        fprintf(stderr,"Error: Attempting to write snapshot = '%d' will exceed allocated memory space for '%d' snapshots\n",
+                run_params->NOUT, ABSOLUTEMAXSNAPS);
+        fprintf(stderr,"To fix this error, simply increase the value of `ABSOLUTEMAXSNAPS` and recompile\n");
+        ABORT(INVALID_OPTION_IN_PARAMS);
+    }
+
+    for(int n = 0; n < run_params->NOUT; n++) {
         // file must already be open.
-        assert( save_fd[n] );
+        XASSERT( save_fd[n] > 0, EXIT_FAILURE, "Error: for output # %d, output file pointer is NULL\n", n);
 
-        // seek to the beginning.
-        fseek( save_fd[n], 0, SEEK_SET );
+        mypwrite(save_fd[n], &ntrees, sizeof(ntrees), 0);
+        mypwrite(save_fd[n], &totgalaxies[n], sizeof(int), sizeof(int));
+        mypwrite(save_fd[n], treengals[n], sizeof(int)*ntrees, sizeof(int) + sizeof(int));
+        /* int nwritten = myfwrite(&ntrees, sizeof(int), 1, save_fd[n]); */
+        /* if (nwritten != 1) { */
+        /*     fprintf(stderr, "Error: Failed to write out 1 element for the number of trees for the header of file %d.\n" */
+        /*             "Only wrote %d elements.\n", n, nwritten); */
+        /* } */
 
-        int nwritten = myfwrite(&ntrees, sizeof(int), 1, save_fd[n]);
-        if (nwritten != 1) {
-            fprintf(stderr, "Error: Failed to write out 1 element for the number of trees for the header of file %d.\n"
-                    "Only wrote %d elements.\n", n, nwritten);
-        }
-
-        nwritten = myfwrite(&totgalaxies[n], sizeof(int), 1, save_fd[n]); 
-        if (nwritten != 1) {
-            fprintf(stderr, "Error: Failed to write out 1 element for the number of galaxies for the header of file %d.\n"
-                    "Only wrote %d elements.\n", n, nwritten);
-        }
+        /* nwritten = myfwrite(&totgalaxies[n], sizeof(int), 1, save_fd[n]);  */
+        /* if (nwritten != 1) { */
+        /*     fprintf(stderr, "Error: Failed to write out 1 element for the number of galaxies for the header of file %d.\n" */
+        /*             "Only wrote %d elements.\n", n, nwritten); */
+        /* } */
         
-        nwritten = myfwrite(treengals[n], sizeof(int), ntrees, save_fd[n]);
-        if (nwritten != ntrees) {
-            fprintf(stderr, "Error: Failed to write out %d elements for the number of galaxies per tree for the header of file %d.\n"
-                    "Only wrote %d elements.\n", ntrees, n, nwritten);
-        }
+        /* nwritten = myfwrite(treengals[n], sizeof(int), ntrees, save_fd[n]); */
+        /* if (nwritten != ntrees) { */
+        /*     fprintf(stderr, "Error: Failed to write out %d elements for the number of galaxies per tree for the header of file %d.\n" */
+        /*             "Only wrote %d elements.\n", ntrees, n, nwritten); */
+        /* } */
 
 
         // close the file and clear handle after everything has been written
-        fclose( save_fd[n] );
-        save_fd[n] = NULL;
+        close( save_fd[n] );
+        save_fd[n] = -1;
     }
+
+    return EXIT_SUCCESS;
 }
 

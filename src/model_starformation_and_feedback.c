@@ -11,7 +11,8 @@
 #include "model_misc.h"
 #include "model_disk_instability.h"
 
-void starformation_and_feedback(const int p, const int centralgal, const double time, const double dt, const int halonr, const int step, struct GALAXY *galaxies)
+void starformation_and_feedback(const int p, const int centralgal, const double time, const double dt, const int halonr, const int step,
+                                struct GALAXY *galaxies, const struct params *run_params)
 {
     double reff, tdyn, strdot, stars, ejected_mass, fac, metallicity;
     double cold_crit;
@@ -20,7 +21,7 @@ void starformation_and_feedback(const int p, const int centralgal, const double 
     strdot = 0.0;
 
     // star formation recipes 
-    if(run_params.SFprescription == 0) {
+    if(run_params->SFprescription == 0) {
         // we take the typical star forming region as 3.0*r_s using the Milky Way as a guide
         reff = 3.0 * galaxies[p].DiskScaleRadius;
         tdyn = reff / galaxies[p].Vvir;
@@ -28,7 +29,7 @@ void starformation_and_feedback(const int p, const int centralgal, const double 
         // from Kauffmann (1996) eq7 x piR^2, (Vvir in km/s, reff in Mpc/h) in units of 10^10Msun/h 
         cold_crit = 0.19 * galaxies[p].Vvir * reff;
         if(galaxies[p].ColdGas > cold_crit && tdyn > 0.0) {
-            strdot = run_params.SfrEfficiency * (galaxies[p].ColdGas - cold_crit) / tdyn;
+            strdot = run_params->SfrEfficiency * (galaxies[p].ColdGas - cold_crit) / tdyn;
         } else {
             strdot = 0.0;
         }
@@ -42,7 +43,7 @@ void starformation_and_feedback(const int p, const int centralgal, const double 
         stars = 0.0;
     }
 
-    double reheated_mass = (run_params.SupernovaRecipeOn == 1) ? run_params.FeedbackReheatingEpsilon * stars: 0.0;
+    double reheated_mass = (run_params->SupernovaRecipeOn == 1) ? run_params->FeedbackReheatingEpsilon * stars: 0.0;
 
 	assert(reheated_mass >= 0.0);
 
@@ -54,11 +55,11 @@ void starformation_and_feedback(const int p, const int centralgal, const double 
     }
     
     // determine ejection
-    if(run_params.SupernovaRecipeOn == 1) {
+    if(run_params->SupernovaRecipeOn == 1) {
         if(galaxies[centralgal].Vvir > 0.0) {
             ejected_mass = 
-                (run_params.FeedbackEjectionEfficiency * (run_params.EtaSNcode * run_params.EnergySNcode) / (galaxies[centralgal].Vvir * galaxies[centralgal].Vvir) -
-                 run_params.FeedbackReheatingEpsilon) * stars;
+                (run_params->FeedbackEjectionEfficiency * (run_params->EtaSNcode * run_params->EnergySNcode) / (galaxies[centralgal].Vvir * galaxies[centralgal].Vvir) -
+                 run_params->FeedbackReheatingEpsilon) * stars;
         } else {
             ejected_mass = 0.0;
         }
@@ -77,36 +78,36 @@ void starformation_and_feedback(const int p, const int centralgal, const double 
 
     // update for star formation 
     metallicity = get_metallicity(galaxies[p].ColdGas, galaxies[p].MetalsColdGas);
-    update_from_star_formation(p, stars, metallicity, galaxies);
+    update_from_star_formation(p, stars, metallicity, galaxies, run_params);
 
     // recompute the metallicity of the cold phase
     metallicity = get_metallicity(galaxies[p].ColdGas, galaxies[p].MetalsColdGas);
 
     // update from SN feedback 
-    update_from_feedback(p, centralgal, reheated_mass, ejected_mass, metallicity, galaxies);
+    update_from_feedback(p, centralgal, reheated_mass, ejected_mass, metallicity, galaxies, run_params);
 
     // check for disk instability
-    if(run_params.DiskInstabilityOn) {
-        check_disk_instability(p, centralgal, halonr, time, dt, step, galaxies);
+    if(run_params->DiskInstabilityOn) {
+        check_disk_instability(p, centralgal, halonr, time, dt, step, galaxies, run_params);
     }
 
     // formation of new metals - instantaneous recycling approximation - only SNII 
     if(galaxies[p].ColdGas > 1.0e-8) {
-        const double FracZleaveDiskVal = run_params.FracZleaveDisk * exp(-1.0 * galaxies[centralgal].Mvir / 30.0);  // Krumholz & Dekel 2011 Eq. 22
-        galaxies[p].MetalsColdGas += run_params.Yield * (1.0 - FracZleaveDiskVal) * stars;
-        galaxies[centralgal].MetalsHotGas += run_params.Yield * FracZleaveDiskVal * stars;
-        // galaxies[centralgal].MetalsEjectedMass += run_params.Yield * FracZleaveDiskVal * stars;
+        const double FracZleaveDiskVal = run_params->FracZleaveDisk * exp(-1.0 * galaxies[centralgal].Mvir / 30.0);  // Krumholz & Dekel 2011 Eq. 22
+        galaxies[p].MetalsColdGas += run_params->Yield * (1.0 - FracZleaveDiskVal) * stars;
+        galaxies[centralgal].MetalsHotGas += run_params->Yield * FracZleaveDiskVal * stars;
+        // galaxies[centralgal].MetalsEjectedMass += run_params->Yield * FracZleaveDiskVal * stars;
     } else {
-        galaxies[centralgal].MetalsHotGas += run_params.Yield * stars;
-        // galaxies[centralgal].MetalsEjectedMass += run_params.Yield * stars;
+        galaxies[centralgal].MetalsHotGas += run_params->Yield * stars;
+        // galaxies[centralgal].MetalsEjectedMass += run_params->Yield * stars;
     }
 }
 
 
 
-void update_from_star_formation(const int p, const double stars, const double metallicity, struct GALAXY *galaxies)
+void update_from_star_formation(const int p, const double stars, const double metallicity, struct GALAXY *galaxies, const struct params *run_params)
 {
-    const double RecycleFraction = run_params.RecycleFraction;
+    const double RecycleFraction = run_params->RecycleFraction;
     // update gas and metals from star formation 
     galaxies[p].ColdGas -= (1 - RecycleFraction) * stars;
     galaxies[p].MetalsColdGas -= metallicity * (1 - RecycleFraction) * stars;
@@ -116,11 +117,12 @@ void update_from_star_formation(const int p, const double stars, const double me
 
 
 
-void update_from_feedback(const int p, const int centralgal, const double reheated_mass, double ejected_mass, const double metallicity, struct GALAXY *galaxies)
+void update_from_feedback(const int p, const int centralgal, const double reheated_mass, double ejected_mass, const double metallicity,
+                          struct GALAXY *galaxies, const struct params *run_params)
 {
 	assert(!(reheated_mass > galaxies[p].ColdGas && reheated_mass > 0.0));
 
-    if(run_params.SupernovaRecipeOn == 1) {
+    if(run_params->SupernovaRecipeOn == 1) {
         galaxies[p].ColdGas -= reheated_mass;
         galaxies[p].MetalsColdGas -= metallicity * reheated_mass;
         

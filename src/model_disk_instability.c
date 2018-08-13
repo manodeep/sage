@@ -10,7 +10,8 @@
 #include "model_misc.h"
 #include "model_mergers.h"
 
-void check_disk_instability(const int p, const int centralgal, const int halonr, const double time, const double dt, const int step, struct GALAXY *galaxies)
+void check_disk_instability(const int p, const int centralgal, const int halonr, const double time, const double dt, const int step,
+                            struct GALAXY *galaxies, const struct params *run_params)
 {
     // Here we calculate the stability of the stellar and gaseous disk as discussed in Mo, Mao & White (1998).
     // For unstable stars and gas, we transfer the required ammount to the bulge to make the disk stable again
@@ -19,7 +20,7 @@ void check_disk_instability(const int p, const int centralgal, const int halonr,
     const double diskmass = galaxies[p].ColdGas + (galaxies[p].StellarMass - galaxies[p].BulgeMass);
     if(diskmass > 0.0) {
         // calculate critical disk mass
-        double Mcrit = galaxies[p].Vmax * galaxies[p].Vmax * (3.0 * galaxies[p].DiskScaleRadius) / run_params.G;
+        double Mcrit = galaxies[p].Vmax * galaxies[p].Vmax * (3.0 * galaxies[p].DiskScaleRadius) / run_params->G;
         if(Mcrit > diskmass) {
             Mcrit = diskmass;
         }
@@ -44,7 +45,7 @@ void check_disk_instability(const int p, const int centralgal, const int halonr,
           
             if((galaxies[p].BulgeMass >  1.0001 * galaxies[p].StellarMass)  || (galaxies[p].MetalsBulgeMass >  1.0001 * galaxies[p].MetalsStellarMass)) {
                 printf("\nInstability: Mbulge > Mtot (stars or metals)\n");
-                run_params.interrupted = 1;
+                /* run_params->interrupted = 1; */
                 //ABORT(EXIT_FAILURE);
             }
         }
@@ -57,11 +58,11 @@ void check_disk_instability(const int p, const int centralgal, const int halonr,
             }
           
             const double unstable_gas_fraction = unstable_gas / galaxies[p].ColdGas;
-            if(run_params.AGNrecipeOn > 0) {
-                grow_black_hole(p, unstable_gas_fraction, galaxies);
+            if(run_params->AGNrecipeOn > 0) {
+                grow_black_hole(p, unstable_gas_fraction, galaxies, run_params);
             }
           
-            collisional_starburst_recipe(unstable_gas_fraction, p, centralgal, time, dt, halonr, 1, step, galaxies);
+            collisional_starburst_recipe(unstable_gas_fraction, p, centralgal, time, dt, halonr, 1, step, galaxies, run_params);
         }
     }
 }

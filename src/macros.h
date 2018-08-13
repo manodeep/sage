@@ -26,6 +26,8 @@
     } while(0)
 
 
+#define MEMORY_INCREASE_FAC   1.2 
+
 #define  STEPS 10         /* Number of integration intervals between two snapshots */
 #define  MAXGALFAC 1
 #define  ALLOCPARAMETER 10.0

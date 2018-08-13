@@ -10,7 +10,8 @@ extern "C" {
         int64_t forestid;
         int64_t treeid;
         int64_t offset;/* byte offset in the file where the tree data begin (i.e., the next line after "#tree TREE_ROOT_ID\n" */
-        int64_t fileid;
+        int32_t fileid;
+        int32_t unused;/* unused but here for alignment */
     };
 
     struct filenames_and_fd {

@@ -140,7 +140,7 @@ static inline int * match_column_name(const char (*wanted_columns)[PARSE_CTREES_
 
 static inline int reallocate_base_ptrs(struct base_ptr_info *base_info, const int64_t new_N)
 {
-    fprintf(stderr,"reallocating from %"PRId64" elements to a larger %"PRId64" elements. current N = %"PRId64"\n",
+    fprintf(stderr,"reallocating from %"PRId64" elements to a %"PRId64" elements. current N = %"PRId64"\n",
             base_info->nallocated, new_N, base_info->N);
     for(int64_t i=0;i<base_info->num_base_ptrs;i++) {
         void **this_ptr = base_info->base_ptrs[i];
@@ -321,10 +321,19 @@ static inline int parse_header_ctrees(char (*column_names)[PARSE_CTREES_MAX_COLN
 
 static inline int parse_line_ctrees(const char *linebuf, const struct ctrees_column_to_ptr *column_info, struct base_ptr_info *base_ptr_info)
 {
-    if(base_ptr_info->nallocated == base_ptr_info->N ) {
-        const int64_t new_N = 2*base_ptr_info->N;
+    if(base_ptr_info->nallocated == base_ptr_info->N) {
+        const double large_N_memory_increase_fac = 1.2;
+        const int64_t small_N_memory_increase_fac = 2;
+        /* double (:=`small_N_memory_increase_fac`) the memory requested for small numbers, otherwise increase by `large_N_memory_increase_fac` */
+        const int64_t thresh_N_for_large_memory = 1000000;/* small_N_memory_increase_fac * N, for N less than this threshold*/
+        const int64_t new_N = (base_ptr_info->N < thresh_N_for_large_memory) ? (base_ptr_info->N*small_N_memory_increase_fac): (base_ptr_info->N*large_N_memory_increase_fac);
         int status = reallocate_base_ptrs(base_ptr_info, new_N);
         if(status != EXIT_SUCCESS) return status;
+        XASSERT(base_ptr_info->nallocated > base_ptr_info->N,
+                EXIT_FAILURE,
+                "Error: Something went wrong while memory reallocation "
+                "nallocated = %"PRId64" should have been larger than N = %"PRId64"\n",
+                base_ptr_info->nallocated, base_ptr_info->N);
     }
 
     int icol = -1;

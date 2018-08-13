@@ -200,6 +200,7 @@ enum sage_error_types {
     /* start off with a large number */
     FILE_NOT_FOUND=1 << 12,
     SNAPSHOT_OUT_OF_RANGE,
+    INVALID_OPTION_IN_PARAMS,
     OUT_OF_MEMBLOCKS,
     MALLOC_FAILURE,
     INVALID_PTR_REALLOC_REQ,
@@ -214,19 +215,36 @@ enum sage_error_types {
 };
 
 struct lhalotree_info {
-    off_t *bytes_offset_for_forest;
-};
+    int64_t nforests;/* number of forests to process */
+    
+    /* lhalotree format only has int32_t for nhalos per forest */
+    int32_t *nhalos_per_forest;/* number of halos to read, nforests elements */
 
-struct ctrees_tree_level_info {
-    off_t offset;/* the byte offset in file corresponding to where the tree data begins */
-    int32_t fd; /* file descriptor for tree */
-    int32_t nhalos;/* number of halos in tree */
+    union {
+        int *fd;/* the file descriptor for each forest (i.e., which file descriptor to read this forest from) nforests elements*/
+#ifdef HDF5        
+        hid_t *h5_fd;/* contains the HDF5 file descriptor for each forest */
+#endif        
+    };
+    off_t *bytes_offset_for_forest;/* where to start reading the files, nforests elements */
+
+    union {
+        int *open_fds;/* contains numfiles elements of open file descriptors, numfiles elements */
+#ifdef HDF5        
+        hid_t *open_h5_fds;/* contains numfiles elements of open HDF5 file descriptors */
+#endif        
+    };
+    int32_t numfiles;/* number of unique files being processed by this task,  must be >=1 and <= lastfile - firstfile + 1 */
+    int32_t unused;/* unused, but present here for alignment */
 };
 
 struct ctrees_info {
-    int64_t nforests;//redundant but helps with the coding
-
-    void *column_info;/* stored as a void * to avoid including the parse_ctrees.h*/
+    //different from totnforests; only stores forests to be processed by ThisTask when in MPI mode
+    //in serial mode, ``forests_info->ctr.nforests == forests_info->totnforests``)
+    int64_t nforests;
+    int64_t ntrees;
+    
+    void *column_info;/* stored as a void * to avoid including parse_ctrees.h here*/
     
     /* forest level quantities */
     int64_t *ntrees_per_forest;/* contains nforests elements */
@@ -236,39 +254,40 @@ struct ctrees_info {
     int *tree_fd;/* contains ntrees elements */
     off_t *tree_offsets;/* contains ntrees elements */
 
+
     /* file level quantities */
-    int64_t numfiles;/* total number of files the forests are spread over (BOX_DIVISIONS^3 per Consistent trees terminology) */
     int *open_fds;/* contains numfiles elements of open file descriptors */
+    int32_t numfiles;/* total number of files the forests are spread over (BOX_DIVISIONS^3 per Consistent trees terminology) */
+    int32_t unused;/* unused, but present for alignment */
 };
 
 /* place-holder for future AHF i/o capabilities */
 struct ahf_info {
+    int64_t nforests;
     void *some_yet_to_be_implemented_ptr;
 };
 
+struct genesis_info {
+    int64_t nforests;
+    void *some_yet_to_be_implemented_ptr;
+};
+
+
 struct forest_info {
-    int32_t *totnhalos_per_forest;
     union {
         struct lhalotree_info lht;
         struct ctrees_info ctr;
         struct ahf_info ahf;
+        struct genesis_info gen;
     };
-    union {
-        FILE *fp;
-        int fd;
-#ifdef HDF5
-        hid_t hdf5_fp;
-#endif
-    };
-    int32_t nforests;
-    int32_t nsnapshots;
-    char filename[4*MAX_STRING_LEN];
+    int64_t totnforests;
+    int64_t nforests_this_task;
 };
 
 
 struct params
 {
-    int    FirstFile;    /* first and last file for processing */
+    int    FirstFile;    /* first and last file for processing; only relevant for lhalotree style files (binary or hdf5) */
     int    LastFile;
 
     char   OutputDir[MAX_STRING_LEN];
@@ -338,7 +357,6 @@ struct params
 
     int interrupted;/* to re-print the progress-bar */
 };
-extern struct params run_params;
 
 
 #endif  /* #ifndef ALLVARS_H */
