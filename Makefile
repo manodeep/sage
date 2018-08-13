@@ -174,10 +174,13 @@ ifeq ($(DO_CHECKS), 1)
   LIBS   +=   -lm
 endif # End of DO_CHECKS if condition -> i.e., we do need to care about paths and such
 
-all:  $(EXEC) $(SAGELIB)
+all:  $(EXEC) $(SAGELIB) concat_sage
 
 $(EXEC): $(OBJS) $(SAGELIB)
 	$(CC) $(CCFLAGS) $(OBJS) $(LIBS)   -o  $(EXEC)
+
+concat_sage: $(SRC_PREFIX)/concat_sage.c
+	$(CC) $(CCFLAGS) $< -o $@
 
 %.o: %.c $(INCL) Makefile
 	$(CC) $(OPTS) $(OPTIMIZE) $(CCFLAGS) -c $< -o $@
