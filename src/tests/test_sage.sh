@@ -36,7 +36,7 @@ fi
 # now cd into the output directory for this sage-run
 cd "$parent_path"/$datadir
 files=`ls model_z*`
-testdata_dir=combined_output
+testdata_dir=output
 if [[ $? == 0 ]]; then
     npassed=0
     nbitwise=0
@@ -65,7 +65,8 @@ else
     # use the knowledge that there should have been 64
     # files for mini-millennium test case
     # This will need to be changed once the files get combined -- MS: 10/08/2018
-    nfiles=64
+    # Changed to 8 -- MS: 13/08/2018
+    nfiles=8
     nfailed=$nfiles
 fi
 echo "Passed: $npassed. Bitwise identical: $nbitwise"
